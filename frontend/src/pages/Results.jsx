@@ -64,7 +64,7 @@ const Results = () => {
           setState(JSON.parse(cached));
         }
       } catch (e) {
-        setError(e?.response?.data?.detail || e.message);
+        setError(e?.response?.data?.detail || e?.message || 'Failed to load decision');
       } finally {
         setLoading(false);
       }
@@ -133,10 +133,11 @@ const Results = () => {
   }
 
   if (error || !state) {
+    const errMsg = typeof error === 'string' ? error : (error?.message || 'Missing analysis.');
     return (
       <section className="mx-auto w-full max-w-2xl px-4 pb-16 pt-8 text-center" data-testid="results-error">
-        <h2 className="text-xl font-semibold">We couldn’t load this decision</h2>
-        <p className="mt-2 text-sm text-muted-foreground">{error || 'Missing analysis.'}</p>
+        <h2 className="text-xl font-semibold">We couldn&apos;t load this decision</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{errMsg}</p>
         <Link to="/wizard" className="mt-6 inline-block">
           <Button>Start a new decision</Button>
         </Link>

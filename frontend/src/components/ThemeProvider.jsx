@@ -1,22 +1,36 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-const ThemeContext = createContext({ theme: 'dark', setTheme: () => {} });
+const ThemeContext = createContext({ theme: 'dark', setTheme: () => {}, toggleTheme: () => {} });
+
+const THEME_KEY = 'sda_theme';
+
+// Read stored theme synchronously to avoid a flash / wrong initial class
+const readInitialTheme = () => {
+  if (typeof window === 'undefined') return 'dark';
+  try {
+    const stored = window.localStorage.getItem(THEME_KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {}
+  return 'dark'; // dark-first default
+};
+
+// Apply theme class to <html> immediately on page load (before React mounts fully)
+if (typeof document !== 'undefined') {
+  const initial = readInitialTheme();
+  if (initial === 'dark') document.documentElement.classList.add('dark');
+  else document.documentElement.classList.remove('dark');
+}
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setThemeState] = useState('dark');
-
-  useEffect(() => {
-    const stored = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-    const initial = stored || (prefersDark ? 'dark' : 'dark'); // default dark-first
-    setThemeState(initial);
-  }, []);
+  const [theme, setThemeState] = useState(readInitialTheme);
 
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') root.classList.add('dark');
     else root.classList.remove('dark');
-    localStorage.setItem('theme', theme);
+    try {
+      window.localStorage.setItem(THEME_KEY, theme);
+    } catch {}
   }, [theme]);
 
   const setTheme = (t) => setThemeState(t);
