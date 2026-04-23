@@ -1,14 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Sparkles, Wand2, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Wand2, Check, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -19,22 +17,82 @@ import {
   saveDecision,
   getGuestId,
   ensureGuestSession,
+  saveWizardDraft,
+  loadWizardDraft,
+  clearWizardDraft,
 } from '@/lib/api';
 import { stepVariants } from '@/lib/motion';
 import AnalysisLoading from '@/components/wizard/AnalysisLoading';
 
 const Wizard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [phase, setPhase] = useState('decision'); // 'decision' | 'loading-qs' | 'questions' | 'review' | 'analyzing'
   const [decision, setDecision] = useState('');
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({}); // qid -> value
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState(null);
+  const [showResumeBanner, setShowResumeBanner] = useState(false);
 
+  // Load prefill (from duplicate) or draft (from previous session)
   useEffect(() => {
     ensureGuestSession().catch(() => {});
+
+    // 1) Duplicate prefill from SavedDecisions
+    const prefill = location.state?.prefill;
+    if (prefill) {
+      setDecision(prefill.decision || '');
+      if (Array.isArray(prefill.questions) && prefill.questions.length) {
+        setQuestions(prefill.questions);
+        setAnswers(prefill.answers || {});
+        setPhase('questions');
+        setStepIndex(0);
+      }
+      return;
+    }
+
+    // 2) Existing draft
+    const draft = loadWizardDraft();
+    if (draft && (draft.decision || (draft.questions && draft.questions.length))) {
+      setShowResumeBanner(true);
+      // keep draft in memory, but don't auto-apply until the user confirms
+      // stash it on the element so resume can read it quickly
+      setResumeDraft(draft);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const [resumeDraft, setResumeDraft] = useState(null);
+
+  const resumeFromDraft = () => {
+    if (!resumeDraft) return;
+    setDecision(resumeDraft.decision || '');
+    setQuestions(resumeDraft.questions || []);
+    setAnswers(resumeDraft.answers || {});
+    const qs = resumeDraft.questions || [];
+    if (qs.length) {
+      setStepIndex(Math.min(resumeDraft.stepIndex ?? 0, qs.length - 1));
+      setPhase(resumeDraft.phase === 'review' ? 'review' : 'questions');
+    } else {
+      setPhase('decision');
+    }
+    setShowResumeBanner(false);
+    toast.success('Draft restored');
+  };
+
+  const dismissDraft = () => {
+    clearWizardDraft();
+    setResumeDraft(null);
+    setShowResumeBanner(false);
+  };
+
+  // Auto-save draft on any meaningful change
+  useEffect(() => {
+    if (phase === 'analyzing' || phase === 'loading-qs') return;
+    if (!decision && !questions.length) return;
+    saveWizardDraft({ decision, questions, answers, stepIndex, phase });
+  }, [decision, questions, answers, stepIndex, phase]);
 
   const totalSteps = 1 + questions.length + 1; // decision + questions + review
   const currentStepNum = phase === 'decision' ? 1 : phase === 'questions' ? 2 + stepIndex : totalSteps;
@@ -54,7 +112,6 @@ const Wizard = () => {
         options: q.options || null,
       }));
       setQuestions(qs);
-      // initialize defaults
       const defaults = {};
       qs.forEach((q) => {
         if (q.type === 'slider') defaults[q.id] = Math.round(((q.min ?? 0) + (q.max ?? 10)) / 2);
@@ -102,6 +159,15 @@ const Wizard = () => {
 
   const setAnswer = (qid, v) => setAnswers((a) => ({ ...a, [qid]: v }));
 
+  const startOver = () => {
+    clearWizardDraft();
+    setDecision('');
+    setQuestions([]);
+    setAnswers({});
+    setStepIndex(0);
+    setPhase('decision');
+  };
+
   const runAnalysis = async (retryNum = 0) => {
     setPhase('analyzing');
     try {
@@ -111,7 +177,6 @@ const Wizard = () => {
         answer: answers[q.id],
       }));
       const result = await analyzeDecision(decision, normAnswers);
-      // auto-save to localStorage AND backend
       const guest_id = getGuestId();
       const title = decision.length > 60 ? decision.slice(0, 57) + '…' : decision;
       try {
@@ -126,17 +191,18 @@ const Wizard = () => {
           'sda_current_result',
           JSON.stringify({ id: saved.id, title, decision, answers: normAnswers, result })
         );
+        clearWizardDraft();
         navigate('/results?id=' + saved.id);
       } catch (e) {
         sessionStorage.setItem(
           'sda_current_result',
           JSON.stringify({ title, decision, answers: normAnswers, result })
         );
+        clearWizardDraft();
         navigate('/results');
       }
     } catch (e) {
       const msg = e?.response?.data?.detail || e.message || 'Analysis failed';
-      // one silent retry on transient network errors
       if (retryNum === 0 && (String(msg).toLowerCase().includes('502') || String(msg).toLowerCase().includes('network') || String(msg).toLowerCase().includes('ai service'))) {
         toast.message('Retrying analysis…');
         await new Promise((r) => setTimeout(r, 800));
@@ -149,13 +215,48 @@ const Wizard = () => {
 
   return (
     <section className="mx-auto w-full max-w-2xl px-4 pb-16 pt-8 sm:px-6" data-testid="wizard-page">
+      {showResumeBanner && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-5 flex items-start justify-between gap-3 rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-sm"
+          data-testid="wizard-resume-draft-banner"
+        >
+          <div className="min-w-0">
+            <div className="font-medium">Pick up where you left off?</div>
+            <div className="mt-0.5 truncate text-xs text-muted-foreground">
+              {resumeDraft?.decision || '(no decision yet)'}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={dismissDraft} data-testid="wizard-resume-dismiss">
+              Start fresh
+            </Button>
+            <Button size="sm" onClick={resumeFromDraft} data-testid="wizard-resume-confirm">
+              Resume
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Progress */}
-      <div className="mb-8" data-testid="wizard-progress">
-        <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Step {currentStepNum} of {totalSteps}</span>
-          <span className="tabular-nums">{progressPct}%</span>
+      <div className="mb-6 flex items-center gap-3" data-testid="wizard-progress">
+        <div className="flex-1">
+          <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+            <span>Step {currentStepNum} of {totalSteps}</span>
+            <span className="tabular-nums">{progressPct}%</span>
+          </div>
+          <Progress value={progressPct} className="h-1.5" />
         </div>
-        <Progress value={progressPct} className="h-1.5" />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={startOver}
+          className="shrink-0 gap-1.5 text-xs"
+          data-testid="wizard-start-over-button"
+        >
+          <RotateCcw className="h-3 w-3" /> Start over
+        </Button>
       </div>
 
       <AnimatePresence mode="wait">
@@ -163,13 +264,13 @@ const Wizard = () => {
           <motion.div key="decision" variants={stepVariants} initial="initial" animate="animate" exit="exit">
             <Card className="rounded-2xl border-border/70 bg-card/60 p-6 shadow-[var(--shadow-1)] backdrop-blur sm:p-8">
               <Badge variant="secondary" className="rounded-full">
-                <Sparkles className="mr-1.5 h-3 w-3" /> Let’s get specific
+                <Sparkles className="mr-1.5 h-3 w-3" /> Let's get specific
               </Badge>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
                 What decision are you making?
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                One sentence is enough. Include the options you’re weighing if you have any.
+                One sentence is enough. Include the options you&apos;re weighing if you have any.
               </p>
               <Textarea
                 data-testid="wizard-decision-statement-textarea"
@@ -202,7 +303,7 @@ const Wizard = () => {
             <Card className="rounded-2xl border-border/70 bg-card/60 p-8" data-testid="wizard-loading-questions">
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Wand2 className="h-4 w-4 animate-pulse text-primary" />
-                Crafting smart follow‑up questions…
+                Crafting smart follow-up questions…
               </div>
               <div className="mt-6 space-y-3">
                 {Array.from({ length: 4 }).map((_, i) => (

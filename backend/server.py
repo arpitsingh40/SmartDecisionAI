@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -9,7 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, Dict, List, Optional
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from ai_service import (
     generate_followups,
@@ -17,6 +17,19 @@ from ai_service import (
     AnalyzePayload,
     FollowUpsResponse,
     DecisionResult,
+)
+from auth_service import (
+    SignupRequest,
+    LoginRequest,
+    AuthResponse,
+    PublicUser,
+    hash_password,
+    verify_password,
+    create_token,
+    get_current_user_optional,
+    get_current_user_required,
+    new_user_id,
+    serialize_user_doc,
 )
 
 ROOT_DIR = Path(__file__).parent
@@ -28,33 +41,39 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
-app = FastAPI(title="Smart Decision AI", version="1.0.0")
+app = FastAPI(title="Smart Decision AI", version="1.1.0")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# ------------------ Models ------------------
+
+# ===================== Models =====================
 class StatusCheck(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     client_name: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+
 class StatusCheckCreate(BaseModel):
     client_name: str
+
 
 class GuestSessionResponse(BaseModel):
     guest_id: str
 
+
 class DecisionContextRequest(BaseModel):
     decision: str = Field(min_length=4, max_length=500)
 
+
 class SaveDecisionRequest(BaseModel):
-    guest_id: str
+    guest_id: Optional[str] = None  # may be omitted for authed users
     title: str
     decision: str
     answers: List[Dict[str, Any]] = []
     result: Dict[str, Any]
+
 
 class DecisionSummary(BaseModel):
     id: str
@@ -65,9 +84,11 @@ class DecisionSummary(BaseModel):
     best_option_score: Optional[int] = None
     confidence: Optional[int] = None
 
+
 class DecisionDocument(BaseModel):
     id: str
-    guest_id: str
+    guest_id: Optional[str] = None
+    user_id: Optional[str] = None
     title: str
     decision: str
     answers: List[Dict[str, Any]]
@@ -76,12 +97,11 @@ class DecisionDocument(BaseModel):
     updated_at: datetime
 
 
-# ------------------ Helpers ------------------
+# ===================== Helpers =====================
 def _strip_mongo(doc: dict) -> dict:
     if not doc:
         return doc
     doc.pop("_id", None)
-    # convert ISO strings back to datetime for Pydantic
     for k in ("created_at", "updated_at"):
         if k in doc and isinstance(doc[k], str):
             try:
@@ -91,10 +111,24 @@ def _strip_mongo(doc: dict) -> dict:
     return doc
 
 
-# ------------------ Routes ------------------
+def _owner_filter(user_id: Optional[str], guest_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Build a Mongo filter for decisions ownership.
+
+    Authed users: only their user_id decisions.
+    Guests: only their guest_id decisions (and no user_id set).
+    """
+    if user_id:
+        return {"user_id": user_id}
+    if guest_id:
+        return {"guest_id": guest_id}
+    return None
+
+
+# ===================== Routes =====================
 @api_router.get("/")
 async def root():
-    return {"message": "Smart Decision AI API is up", "version": "1.0.0"}
+    return {"message": "Smart Decision AI API is up", "version": "1.1.0"}
+
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):
@@ -103,6 +137,7 @@ async def create_status_check(input: StatusCheckCreate):
     doc['timestamp'] = doc['timestamp'].isoformat()
     await db.status_checks.insert_one(doc)
     return status_obj
+
 
 @api_router.get("/status", response_model=List[StatusCheck])
 async def get_status_checks():
@@ -113,14 +148,53 @@ async def get_status_checks():
     return status_checks
 
 
-# ---- Guest session ----
+# ===================== Auth =====================
+@api_router.post("/auth/signup", response_model=AuthResponse)
+async def signup(payload: SignupRequest):
+    email = payload.email.lower().strip()
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+    user_id = new_user_id()
+    now = datetime.now(timezone.utc)
+    user_doc = {
+        "id": user_id,
+        "email": email,
+        "name": payload.name,
+        "password_hash": hash_password(payload.password),
+        "created_at": now.isoformat(),
+    }
+    await db.users.insert_one(user_doc)
+    token = create_token(user_id, email)
+    return AuthResponse(token=token, user=serialize_user_doc(user_doc))
+
+
+@api_router.post("/auth/login", response_model=AuthResponse)
+async def login(payload: LoginRequest):
+    email = payload.email.lower().strip()
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user or not verify_password(payload.password, user.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_token(user["id"], email)
+    return AuthResponse(token=token, user=serialize_user_doc(user))
+
+
+@api_router.get("/auth/me", response_model=PublicUser)
+async def me(payload: Dict[str, Any] = Depends(get_current_user_required)):
+    user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return serialize_user_doc(user)
+
+
+# ===================== Guest session =====================
 @api_router.post("/guest/session", response_model=GuestSessionResponse)
 async def create_guest_session():
     guest_id = f"guest_{uuid.uuid4().hex[:12]}"
     return GuestSessionResponse(guest_id=guest_id)
 
 
-# ---- Decision engine ----
+# ===================== Decision engine (follow-ups + analyze) =====================
 @api_router.post("/decisions/followups", response_model=FollowUpsResponse)
 async def api_followups(payload: DecisionContextRequest):
     try:
@@ -131,10 +205,9 @@ async def api_followups(payload: DecisionContextRequest):
         raise HTTPException(status_code=502, detail=f"AI service error: {str(e)[:200]}")
 
 
-# ----- Async Analyze Jobs (avoids ingress 60s timeout on long LLM calls) -----
-# In-memory job store. For a single-worker deployment this is fine; for multi-worker, use Redis/DB.
+# Async analyze job store (in-memory, single-worker safe).
 _analyze_jobs: Dict[str, Dict[str, Any]] = {}
-_JOB_TTL_SECONDS = 900  # 15 min
+_JOB_TTL_SECONDS = 900
 
 
 def _prune_old_jobs() -> None:
@@ -169,7 +242,7 @@ async def _run_analyze_job(job_id: str, decision: str, answers: List[Dict[str, A
 
 @api_router.post("/decisions/analyze")
 async def api_analyze(payload: AnalyzePayload):
-    """Synchronous analyze endpoint (short decisions only). For long calls prefer /start+/status."""
+    """Synchronous analyze — small/quick decisions."""
     try:
         result = await analyze_decision(payload.decision, payload.answers)
         return result
@@ -180,7 +253,6 @@ async def api_analyze(payload: AnalyzePayload):
 
 @api_router.post("/decisions/analyze/start")
 async def api_analyze_start(payload: AnalyzePayload, background_tasks: BackgroundTasks):
-    """Start an async analyze job. Returns immediately with job_id. Client polls /analyze/status."""
     _prune_old_jobs()
     job_id = str(uuid.uuid4())
     _analyze_jobs[job_id] = {
@@ -188,7 +260,6 @@ async def api_analyze_start(payload: AnalyzePayload, background_tasks: Backgroun
         "created_at": datetime.now(timezone.utc),
         "decision": payload.decision,
     }
-    # Run as a real asyncio task (background_tasks runs after response — also fine)
     asyncio.create_task(_run_analyze_job(job_id, payload.decision, payload.answers))
     return {"job_id": job_id, "status": "pending"}
 
@@ -206,15 +277,20 @@ async def api_analyze_status(job_id: str):
     return resp
 
 
-# ---- Saved decisions CRUD ----
+# ===================== Saved decisions (scoped by user_id OR guest_id) =====================
 @api_router.post("/decisions", response_model=DecisionDocument)
-async def save_decision(payload: SaveDecisionRequest):
-    if not payload.guest_id.startswith("guest_"):
-        raise HTTPException(status_code=400, detail="Invalid guest_id")
+async def save_decision(
+    payload: SaveDecisionRequest,
+    user_payload: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    user_id = user_payload.get("sub") if user_payload else None
+    if not user_id and (not payload.guest_id or not payload.guest_id.startswith("guest_")):
+        raise HTTPException(status_code=400, detail="Missing owner (auth or guest_id required)")
     now = datetime.now(timezone.utc)
     doc = DecisionDocument(
         id=str(uuid.uuid4()),
-        guest_id=payload.guest_id,
+        user_id=user_id,
+        guest_id=None if user_id else payload.guest_id,
         title=payload.title or payload.decision[:60],
         decision=payload.decision,
         answers=payload.answers,
@@ -230,8 +306,15 @@ async def save_decision(payload: SaveDecisionRequest):
 
 
 @api_router.get("/decisions", response_model=List[DecisionSummary])
-async def list_decisions(guest_id: str = Query(..., min_length=8)):
-    cursor = db.decisions.find({"guest_id": guest_id}, {"_id": 0}).sort("created_at", -1).limit(200)
+async def list_decisions(
+    guest_id: Optional[str] = Query(default=None),
+    user_payload: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    user_id = user_payload.get("sub") if user_payload else None
+    q = _owner_filter(user_id, guest_id)
+    if not q:
+        return []
+    cursor = db.decisions.find(q, {"_id": 0}).sort("created_at", -1).limit(200)
     items = await cursor.to_list(200)
     out: List[DecisionSummary] = []
     for it in items:
@@ -255,8 +338,17 @@ async def list_decisions(guest_id: str = Query(..., min_length=8)):
 
 
 @api_router.get("/decisions/{decision_id}", response_model=DecisionDocument)
-async def get_decision(decision_id: str, guest_id: str = Query(..., min_length=8)):
-    doc = await db.decisions.find_one({"id": decision_id, "guest_id": guest_id}, {"_id": 0})
+async def get_decision(
+    decision_id: str,
+    guest_id: Optional[str] = Query(default=None),
+    user_payload: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    user_id = user_payload.get("sub") if user_payload else None
+    q = _owner_filter(user_id, guest_id)
+    if not q:
+        raise HTTPException(status_code=400, detail="Missing owner (auth or guest_id)")
+    q["id"] = decision_id
+    doc = await db.decisions.find_one(q, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Decision not found")
     _strip_mongo(doc)
@@ -264,8 +356,17 @@ async def get_decision(decision_id: str, guest_id: str = Query(..., min_length=8
 
 
 @api_router.delete("/decisions/{decision_id}")
-async def delete_decision(decision_id: str, guest_id: str = Query(..., min_length=8)):
-    res = await db.decisions.delete_one({"id": decision_id, "guest_id": guest_id})
+async def delete_decision(
+    decision_id: str,
+    guest_id: Optional[str] = Query(default=None),
+    user_payload: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    user_id = user_payload.get("sub") if user_payload else None
+    q = _owner_filter(user_id, guest_id)
+    if not q:
+        raise HTTPException(status_code=400, detail="Missing owner")
+    q["id"] = decision_id
+    res = await db.decisions.delete_one(q)
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Decision not found")
     return {"ok": True}
@@ -287,6 +388,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

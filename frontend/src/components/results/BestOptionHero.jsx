@@ -2,7 +2,9 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Trophy, ShieldAlert, TrendingUp, Clock } from 'lucide-react';
+import {
+  Trophy, ShieldAlert, TrendingUp, Clock, Target, DollarSign, MapPin, Gauge, Sparkles,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const BestOptionHero = ({ best, reasoning, confidence }) => {
@@ -42,10 +44,15 @@ const BestOptionHero = ({ best, reasoning, confidence }) => {
           <Progress value={best.score} className="h-2" />
         </div>
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Info icon={ShieldAlert} label="Risk" value={best.risk_level} />
-          <Info icon={Clock} label="Short‑term" value={best.short_term_outcome} />
-          <Info icon={TrendingUp} label="Long‑term" value={best.long_term_outcome} />
+          <Info icon={Target} label="Success probability" value={typeof best.success_probability === 'number' ? `${best.success_probability}%` : '—'} />
+          <Info icon={Clock} label="Time to result" value={best.time_to_result || '—'} />
+          <Info icon={TrendingUp} label="Expected return" value={best.expected_return || '—'} />
+          {best.financial_ratio && <Info icon={DollarSign} label="Cost:reward" value={best.financial_ratio} />}
+          {best.geography && <Info icon={MapPin} label="Geography" value={best.geography} />}
+          {typeof best.easiness === 'number' && <Info icon={Gauge} label="Easiness" value={`${best.easiness}/100`} />}
+          {typeof confidence === 'number' && <Info icon={Sparkles} label="Confidence" value={`${confidence}%`} />}
         </div>
       </Card>
     </motion.div>
@@ -58,7 +65,7 @@ const Info = ({ icon: Icon, label, value }) => (
       <Icon className="h-3.5 w-3.5" />
       {label}
     </div>
-    <div className="mt-1 text-sm leading-snug">{value}</div>
+    <div className="mt-1 line-clamp-2 text-sm leading-snug">{value}</div>
   </div>
 );
 

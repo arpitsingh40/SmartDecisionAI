@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,11 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Trash2, Sparkles, Trophy, ArrowRight, Inbox } from 'lucide-react';
-import { listDecisions, deleteDecision, getGuestId } from '@/lib/api';
+import { Trash2, Sparkles, Trophy, ArrowRight, Inbox, Copy } from 'lucide-react';
+import { listDecisions, deleteDecision, getDecision, getGuestId } from '@/lib/api';
 import { toast } from 'sonner';
 import { stagger, fadeUp } from '@/lib/motion';
+import { useAuth } from '@/context/AuthContext';
 
 const formatDate = (d) => {
   try {
@@ -26,6 +27,8 @@ const formatDate = (d) => {
 const SavedDecisions = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   const load = async () => {
     setLoading(true);
@@ -40,7 +43,7 @@ const SavedDecisions = () => {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [user?.id]);
 
   const onDelete = async (id) => {
     try {
@@ -53,11 +56,43 @@ const SavedDecisions = () => {
     }
   };
 
+  const onDuplicate = async (id) => {
+    try {
+      const guestId = getGuestId();
+      const doc = await getDecision(id, guestId);
+      // Rebuild wizard question list + answers from saved answers array
+      const questions = (doc.answers || []).map((a, i) => ({
+        id: `q_dup_${i}`,
+        question: a.question,
+        type: a.type || (typeof a.answer === 'number' ? 'slider' : Array.isArray(a.answer) ? 'multi_choice' : 'text'),
+        options: Array.isArray(a.answer) ? a.answer : null,
+      }));
+      const answers = {};
+      questions.forEach((q, i) => {
+        answers[q.id] = doc.answers[i].answer;
+      });
+      navigate('/wizard', {
+        state: {
+          prefill: {
+            decision: doc.decision,
+            questions,
+            answers,
+          },
+        },
+      });
+      toast.success('Decision duplicated — tweak and re-analyze');
+    } catch (e) {
+      toast.error('Failed to duplicate');
+    }
+  };
+
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-8" data-testid="saved-decisions-page">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">Library</div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">
+            {user ? 'Your library' : 'Guest library (local only)'}
+          </div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Saved decisions</h1>
         </div>
         <Link to="/wizard">
@@ -117,11 +152,22 @@ const SavedDecisions = () => {
                   </div>
                 </div>
                 <div className="mt-4 flex items-center justify-between">
-                  <Link to={`/saved/${item.id}`}>
-                    <Button variant="secondary" size="sm" className="gap-1.5" data-testid="saved-decision-open-button">
-                      Open <ArrowRight className="h-3.5 w-3.5" />
+                  <div className="flex gap-1.5">
+                    <Link to={`/saved/${item.id}`}>
+                      <Button variant="secondary" size="sm" className="gap-1.5" data-testid="saved-decision-open-button">
+                        Open <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => onDuplicate(item.id)}
+                      data-testid="saved-decision-duplicate-button"
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Duplicate
                     </Button>
-                  </Link>
+                  </div>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" aria-label="Delete" data-testid="saved-decision-delete-button">

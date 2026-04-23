@@ -1,0 +1,256 @@
+{
+  "summary": {
+    "total_tests": 41,
+    "passed_tests": 37,
+    "success_rate": 90.2,
+    "timestamp": "2026-04-23T22:03:52.281493"
+  },
+  "detailed_results": [
+    {
+      "test": "API Root",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:01:42.389314"
+    },
+    {
+      "test": "Create Guest Session",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:01:42.390547"
+    },
+    {
+      "test": "User Signup",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:01:42.615303"
+    },
+    {
+      "test": "User Login",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:01:42.841302"
+    },
+    {
+      "test": "Auth Me",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:01:42.843697"
+    },
+    {
+      "test": "Signup Invalid Email",
+      "success": true,
+      "details": "Status: 422",
+      "timestamp": "2026-04-23T22:01:42.846180"
+    },
+    {
+      "test": "Login Wrong Password",
+      "success": true,
+      "details": "Status: 401",
+      "timestamp": "2026-04-23T22:01:43.073406"
+    },
+    {
+      "test": "Generate Follow-ups",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:01:48.980990"
+    },
+    {
+      "test": "Get Follow-ups for Analysis",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:01:53.844999"
+    },
+    {
+      "test": "Start Analysis Job",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:01:53.846786"
+    },
+    {
+      "test": "Check Analysis Status",
+      "success": false,
+      "details": "Error: HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-23T22:02:25.874002"
+    },
+    {
+      "test": "Check Analysis Status",
+      "success": false,
+      "details": "Error: HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-23T22:02:57.900801"
+    },
+    {
+      "test": "Check Analysis Status",
+      "success": false,
+      "details": "Error: HTTPConnectionPool(host='localhost', port=8001): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-23T22:03:29.932326"
+    },
+    {
+      "test": "Check Analysis Status",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:03:52.273806"
+    },
+    {
+      "test": "Schema - options",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273938"
+    },
+    {
+      "test": "Schema - best_option_id",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273942"
+    },
+    {
+      "test": "Schema - reasoning",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273945"
+    },
+    {
+      "test": "Schema - confidence",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273948"
+    },
+    {
+      "test": "Schema - goal",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273951"
+    },
+    {
+      "test": "Schema - key_insights",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273954"
+    },
+    {
+      "test": "Schema - Option 1 success_probability",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273959"
+    },
+    {
+      "test": "Schema - Option 1 expected_return",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273965"
+    },
+    {
+      "test": "Schema - Option 1 time_to_result",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273967"
+    },
+    {
+      "test": "Schema - Option 1 easiness",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273970"
+    },
+    {
+      "test": "Schema - Option 1 financial_ratio",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273972"
+    },
+    {
+      "test": "Schema - Option 2 success_probability",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273975"
+    },
+    {
+      "test": "Schema - Option 2 expected_return",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273978"
+    },
+    {
+      "test": "Schema - Option 2 time_to_result",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273981"
+    },
+    {
+      "test": "Schema - Option 2 easiness",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273983"
+    },
+    {
+      "test": "Schema - Option 2 financial_ratio",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273987"
+    },
+    {
+      "test": "Schema - Execution Plan title",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273991"
+    },
+    {
+      "test": "Schema - Execution Plan total_timeline",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273994"
+    },
+    {
+      "test": "Schema - Execution Plan steps",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.273997"
+    },
+    {
+      "test": "Schema - Execution Step step",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.274000"
+    },
+    {
+      "test": "Schema - Execution Step action",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.274003"
+    },
+    {
+      "test": "Schema - Execution Step timeline",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.274006"
+    },
+    {
+      "test": "Schema - Execution Step priority",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T22:03:52.274008"
+    },
+    {
+      "test": "Save Decision",
+      "success": false,
+      "details": "Status: 200 (expected 201) - No error details",
+      "timestamp": "2026-04-23T22:03:52.276282"
+    },
+    {
+      "test": "List Decisions",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:03:52.278118"
+    },
+    {
+      "test": "List User Decisions",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:03:52.279755"
+    },
+    {
+      "test": "List Guest Decisions",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T22:03:52.281344"
+    }
+  ]
+}

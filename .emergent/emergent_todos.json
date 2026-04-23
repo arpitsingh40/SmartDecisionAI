@@ -1,50 +1,38 @@
 [
   {
-    "content": "Phase 1: Get Emergent LLM integration playbook",
+    "content": "Phase 3: Install json-repair lib; implement server-side JSON repair fallback",
     "status": "completed"
   },
   {
-    "content": "Phase 1: Create POC test script validating structured JSON output (follow-ups + decision analysis)",
+    "content": "Phase 3: Upgrade AI to Decision Intelligence framework",
     "status": "completed"
   },
   {
-    "content": "Phase 1: Run POC and fix until all core user stories pass (Claude Sonnet 4.5 passes 3/3)",
+    "content": "Phase 3: Implement email/password auth (bcrypt + JWT 30d) + scope decisions",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Get design guidelines from design_agent",
+    "content": "Phase 3: Frontend AuthContext + Login/Signup page + token header interceptor",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Install missing frontend packages (framer-motion, jspdf, html2canvas)",
+    "content": "Phase 3: Upgrade Results UI for new fields (Key Insights, Execution Plan, Plan B, expanded option details)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Implement backend (FastAPI endpoints, Motor, guest sessions, decisions CRUD, LLM service)",
+    "content": "Phase 3: Wizard draft auto-save to localStorage (resume on refresh)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Implement frontend (Landing + Wizard + Results Dashboard + Saved Decisions + PDF export)",
+    "content": "Phase 3: Duplicate past decision (from saved page -> prefill wizard)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Fix async job pattern to bypass ingress 60s timeout",
+    "content": "Phase 3: Deeper what-if (debounced live scoring + sensitivity insights)",
     "status": "completed"
   },
   {
-    "content": "Phase 2: Fix wizard multi-choice interaction (switched to button-based)",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 2: Fix theme persistence + results error rendering",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 2: All user stories covered in Development",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 2: End to End Testing using Testing Agent - ALL CRITICAL FLOWS PASS",
-    "status": "completed"
+    "content": "Phase 3: End to End Testing via Testing Agent",
+    "status": "in_progress"
   }
 ]

@@ -3,14 +3,13 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Trophy, ArrowLeft, Save, FileDown, Sparkles, ShieldAlert,
-  TrendingUp, Clock, CheckCircle2, XCircle, Scale
+  TrendingUp, Scale, Lightbulb, ListChecks, AlertTriangle, Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { analyzeDecision, saveDecision, getDecision, getGuestId } from '@/lib/api';
 import ScoreBarChart from '@/components/results/ScoreBarChart';
@@ -20,6 +19,9 @@ import ProsConsTable from '@/components/results/ProsConsTable';
 import WhatIfPanel from '@/components/results/WhatIfPanel';
 import CompareView from '@/components/results/CompareView';
 import ExportDialog from '@/components/results/ExportDialog';
+import KeyInsights from '@/components/results/KeyInsights';
+import ExecutionPlanCard from '@/components/results/ExecutionPlanCard';
+import PlanBCard from '@/components/results/PlanBCard';
 
 const useQuery = () => {
   const { search } = useLocation();
@@ -30,7 +32,7 @@ const Results = () => {
   const q = useQuery();
   const id = q.get('id');
   const navigate = useNavigate();
-  const [state, setState] = useState(null); // { decision, answers, result, title, id }
+  const [state, setState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [whatIfResult, setWhatIfResult] = useState(null);
@@ -43,7 +45,6 @@ const Results = () => {
     const load = async () => {
       setLoading(true);
       try {
-        // Prefer backend if id in URL
         if (id) {
           const guest_id = getGuestId();
           const doc = await getDecision(id, guest_id);
@@ -83,9 +84,9 @@ const Results = () => {
     try {
       const res = await analyzeDecision(state.decision, updatedAnswers);
       setWhatIfResult(res);
-      toast.success('What‑if analysis updated');
+      toast.success('What-if analysis updated');
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'What‑if failed');
+      toast.error(e?.response?.data?.detail || 'What-if failed');
     } finally {
       setWhatIfLoading(false);
     }
@@ -147,13 +148,19 @@ const Results = () => {
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 pb-16 pt-8 sm:px-6 lg:px-8" data-testid="results-page">
-      {/* Header actions */}
+      {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">Decision</div>
           <h1 className="mt-1 truncate text-xl font-semibold tracking-tight sm:text-2xl" data-testid="results-decision-title">
             {state.decision}
           </h1>
+          {result?.goal && (
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs text-primary" data-testid="results-goal">
+              <Zap className="h-3 w-3" />
+              Goal: <span className="text-foreground/90">{result.goal}</span>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link to="/wizard">
@@ -172,16 +179,21 @@ const Results = () => {
       </div>
 
       <Tabs defaultValue="overview">
-        <TabsList className="mb-6">
+        <TabsList className="mb-6 flex flex-wrap">
           <TabsTrigger value="overview" data-testid="results-tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="plan" data-testid="results-tab-plan">Execution plan</TabsTrigger>
           <TabsTrigger value="compare" data-testid="results-tab-compare">Compare</TabsTrigger>
-          <TabsTrigger value="whatif" data-testid="results-tab-whatif">What‑if</TabsTrigger>
+          <TabsTrigger value="whatif" data-testid="results-tab-whatif">What-if</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
           <div ref={reportRef} className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             <div className="space-y-6 lg:col-span-8">
               {best && <BestOptionHero best={best} reasoning={result?.reasoning} confidence={result?.confidence} />}
+
+              {Array.isArray(result?.key_insights) && result.key_insights.length > 0 && (
+                <KeyInsights insights={result.key_insights} />
+              )}
 
               <Card className="rounded-2xl border-border/70 bg-card/60 p-5 sm:p-6" data-testid="results-score-chart">
                 <div className="mb-3 flex items-center justify-between">
@@ -223,7 +235,7 @@ const Results = () => {
                 </div>
                 <Progress value={result?.confidence ?? 0} className="mt-4 h-2" />
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Confidence reflects how decisive the AI’s recommendation is given your inputs.
+                  Confidence reflects how decisive the AI&apos;s recommendation is given your inputs.
                 </p>
               </Card>
 
@@ -236,6 +248,10 @@ const Results = () => {
                 </p>
               </Card>
 
+              {result?.plan_b && (
+                <PlanBCard planB={result.plan_b} trigger={result.plan_b_trigger} />
+              )}
+
               <Card className="rounded-2xl border-border/70 bg-card/60 p-5">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Quick stats</div>
                 <div className="mt-3 grid grid-cols-3 gap-3 text-center">
@@ -246,6 +262,17 @@ const Results = () => {
               </Card>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="plan">
+          {result?.execution_plan ? (
+            <ExecutionPlanCard plan={result.execution_plan} best={best} />
+          ) : (
+            <Card className="rounded-2xl border-border/70 bg-card/60 p-8 text-center" data-testid="results-no-execution-plan">
+              <Lightbulb className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">No execution plan was returned for this analysis.</p>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="compare">
