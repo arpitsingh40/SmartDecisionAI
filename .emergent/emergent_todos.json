@@ -13,27 +13,27 @@
   },
   {
     "content": "Phase 2: Get design guidelines from design_agent",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Phase 2: Install missing frontend packages (framer-motion, jspdf, html2canvas)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Phase 2: Implement backend (FastAPI endpoints, Motor, guest sessions, decisions CRUD, LLM service)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Phase 2: Implement frontend (Landing + Wizard + Results Dashboard + Saved Decisions + PDF export)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Phase 2: All user stories covered in Development",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Phase 2: End to End Testing using Testing Agent",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Phase 3: Interactive Tools (what-if + side-by-side comparison) + UX polish",
