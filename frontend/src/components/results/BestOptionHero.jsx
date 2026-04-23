@@ -34,14 +34,14 @@ const BestOptionHero = ({ best, reasoning, confidence }) => {
           <div className="min-w-[120px] rounded-xl border border-border/70 bg-background/50 p-4 text-center">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Score</div>
             <div className="font-display text-4xl font-semibold tabular-nums" data-testid="results-best-option-score">
-              {best.score}
+              {best.computed_score ?? best.score}
             </div>
             <div className="mt-2 text-[10px] uppercase tracking-widest text-muted-foreground">/ 100</div>
           </div>
         </div>
 
         <div className="mt-4">
-          <Progress value={best.score} className="h-2" />
+          <Progress value={best.computed_score ?? best.score} className="h-2" />
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

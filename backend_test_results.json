@@ -1,244 +1,322 @@
 {
   "summary": {
-    "total_tests": 39,
-    "passed_tests": 37,
-    "success_rate": 94.9,
-    "timestamp": "2026-04-23T22:24:02.542874"
+    "total_tests": 52,
+    "passed_tests": 44,
+    "success_rate": 84.6,
+    "timestamp": "2026-04-23T23:05:17.847362"
   },
   "detailed_results": [
     {
       "test": "API Root",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T22:23:07.864973"
+      "timestamp": "2026-04-23T23:01:58.288736"
     },
     {
       "test": "Create Guest Session",
-      "success": true,
-      "details": "Status: 200",
-      "timestamp": "2026-04-23T22:23:07.982566"
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-23T23:02:28.404140"
     },
     {
       "test": "User Signup",
-      "success": true,
-      "details": "Status: 200",
-      "timestamp": "2026-04-23T22:23:08.366698"
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-23T23:02:58.518773"
     },
     {
       "test": "User Login",
-      "success": true,
-      "details": "Status: 200",
-      "timestamp": "2026-04-23T22:23:08.735340"
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-23T23:03:28.641853"
     },
     {
       "test": "Auth Me",
-      "success": true,
-      "details": "Status: 200",
-      "timestamp": "2026-04-23T22:23:08.870032"
+      "success": false,
+      "details": "No auth token available",
+      "timestamp": "2026-04-23T23:03:28.641883"
     },
     {
       "test": "Signup Invalid Email",
       "success": true,
       "details": "Status: 422",
-      "timestamp": "2026-04-23T22:23:09.013566"
-    },
-    {
-      "test": "Login Wrong Password",
-      "success": true,
-      "details": "Status: 401",
-      "timestamp": "2026-04-23T22:23:09.347710"
+      "timestamp": "2026-04-23T23:03:46.628437"
     },
     {
       "test": "Generate Follow-ups",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T22:23:14.485912"
+      "timestamp": "2026-04-23T23:03:54.209777"
+    },
+    {
+      "test": "Suggest Factors",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T23:03:58.087105"
+    },
+    {
+      "test": "Factor Quality",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:03:58.087733"
+    },
+    {
+      "test": "Get Factors for Analysis",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-23T23:04:00.486831"
     },
     {
       "test": "Get Follow-ups for Analysis",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T22:23:19.760789"
+      "timestamp": "2026-04-23T23:04:03.312872"
     },
     {
-      "test": "Start Analysis Job",
+      "test": "Start Analysis Job with Factors",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T22:23:19.959798"
+      "timestamp": "2026-04-23T23:04:03.453446"
     },
     {
       "test": "Check Analysis Status",
       "success": false,
       "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
-      "timestamp": "2026-04-23T22:23:52.037728"
+      "timestamp": "2026-04-23T23:04:36.557533"
+    },
+    {
+      "test": "Check Analysis Status",
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-23T23:05:09.703994"
     },
     {
       "test": "Check Analysis Status",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T22:24:01.972973"
+      "timestamp": "2026-04-23T23:05:17.593363"
     },
     {
       "test": "Schema - options",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973593"
+      "timestamp": "2026-04-23T23:05:17.594026"
     },
     {
       "test": "Schema - best_option_id",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973600"
+      "timestamp": "2026-04-23T23:05:17.594038"
     },
     {
       "test": "Schema - reasoning",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973603"
+      "timestamp": "2026-04-23T23:05:17.594042"
     },
     {
       "test": "Schema - confidence",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973606"
+      "timestamp": "2026-04-23T23:05:17.594045"
     },
     {
       "test": "Schema - goal",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973609"
+      "timestamp": "2026-04-23T23:05:17.594048"
     },
     {
       "test": "Schema - key_insights",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973612"
+      "timestamp": "2026-04-23T23:05:17.594051"
     },
     {
-      "test": "Schema - Option 1 success_probability",
+      "test": "Phase4 Schema - assumptions",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973619"
+      "timestamp": "2026-04-23T23:05:17.594054"
     },
     {
-      "test": "Schema - Option 1 expected_return",
+      "test": "Phase4 Schema - bias_flags",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973625"
+      "timestamp": "2026-04-23T23:05:17.594061"
     },
     {
-      "test": "Schema - Option 1 time_to_result",
+      "test": "Phase4 Schema - factors_used",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973628"
+      "timestamp": "2026-04-23T23:05:17.594064"
     },
     {
-      "test": "Schema - Option 1 easiness",
+      "test": "Phase4 Schema - Do Nothing Option",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973642"
+      "timestamp": "2026-04-23T23:05:17.594071"
     },
     {
-      "test": "Schema - Option 1 financial_ratio",
+      "test": "Phase4 Schema - Option 1 factor_ratings",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973645"
+      "timestamp": "2026-04-23T23:05:17.594076"
     },
     {
-      "test": "Schema - Option 2 success_probability",
+      "test": "Phase4 Schema - Option 1 Purchase Price rating",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973648"
+      "timestamp": "2026-04-23T23:05:17.594083"
     },
     {
-      "test": "Schema - Option 2 expected_return",
+      "test": "Phase4 Schema - Option 1 Long-term Reliability rating",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973650"
+      "timestamp": "2026-04-23T23:05:17.594086"
     },
     {
-      "test": "Schema - Option 2 time_to_result",
+      "test": "Phase4 Schema - Option 1 Fuel Efficiency rating",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973653"
+      "timestamp": "2026-04-23T23:05:17.594089"
     },
     {
-      "test": "Schema - Option 2 easiness",
+      "test": "Phase4 Schema - Option 1 Vehicle Condition rating",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973656"
+      "timestamp": "2026-04-23T23:05:17.594092"
     },
     {
-      "test": "Schema - Option 2 financial_ratio",
+      "test": "Phase4 Schema - Option 1 scenario best_case",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973659"
+      "timestamp": "2026-04-23T23:05:17.594096"
+    },
+    {
+      "test": "Phase4 Schema - Option 1 scenario worst_case",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594099"
+    },
+    {
+      "test": "Phase4 Schema - Option 1 scenario most_likely",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594101"
+    },
+    {
+      "test": "Phase4 Schema - Option 1 future one_year",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594105"
+    },
+    {
+      "test": "Phase4 Schema - Option 1 future five_year",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594108"
+    },
+    {
+      "test": "Phase4 Schema - Option 2 factor_ratings",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594111"
+    },
+    {
+      "test": "Phase4 Schema - Option 2 Purchase Price rating",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594115"
+    },
+    {
+      "test": "Phase4 Schema - Option 2 Long-term Reliability rating",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594118"
+    },
+    {
+      "test": "Phase4 Schema - Option 2 Fuel Efficiency rating",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594121"
+    },
+    {
+      "test": "Phase4 Schema - Option 2 Vehicle Condition rating",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594124"
+    },
+    {
+      "test": "Phase4 Schema - Option 2 scenario best_case",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594127"
+    },
+    {
+      "test": "Phase4 Schema - Option 2 scenario worst_case",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594130"
+    },
+    {
+      "test": "Phase4 Schema - Option 2 scenario most_likely",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594132"
+    },
+    {
+      "test": "Phase4 Schema - Option 2 future one_year",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594139"
+    },
+    {
+      "test": "Phase4 Schema - Option 2 future five_year",
+      "success": true,
+      "details": "",
+      "timestamp": "2026-04-23T23:05:17.594142"
     },
     {
       "test": "Schema - Execution Plan title",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973662"
+      "timestamp": "2026-04-23T23:05:17.594146"
     },
     {
       "test": "Schema - Execution Plan total_timeline",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973665"
+      "timestamp": "2026-04-23T23:05:17.594148"
     },
     {
       "test": "Schema - Execution Plan steps",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973668"
+      "timestamp": "2026-04-23T23:05:17.594151"
     },
     {
-      "test": "Schema - Execution Step step",
+      "test": "Phase4 Schema - Bias Flag Structure",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T22:24:01.973672"
-    },
-    {
-      "test": "Schema - Execution Step action",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T22:24:01.973675"
-    },
-    {
-      "test": "Schema - Execution Step timeline",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T22:24:01.973678"
-    },
-    {
-      "test": "Schema - Execution Step priority",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T22:24:01.973680"
+      "timestamp": "2026-04-23T23:05:17.594159"
     },
     {
       "test": "Save Decision",
       "success": false,
-      "details": "Status: 200 (expected 201) - No error details",
-      "timestamp": "2026-04-23T22:24:02.187869"
+      "details": "Status: 400 (expected 201) - Missing owner (auth or guest_id required)",
+      "timestamp": "2026-04-23T23:05:17.716164"
     },
     {
       "test": "List Decisions",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T22:24:02.297547"
+      "timestamp": "2026-04-23T23:05:17.846465"
     },
     {
-      "test": "List User Decisions",
-      "success": true,
-      "details": "Status: 200",
-      "timestamp": "2026-04-23T22:24:02.411533"
-    },
-    {
-      "test": "List Guest Decisions",
-      "success": true,
-      "details": "Status: 200",
-      "timestamp": "2026-04-23T22:24:02.541976"
+      "test": "Auth Scoped Decisions",
+      "success": false,
+      "details": "No auth token for scoping test",
+      "timestamp": "2026-04-23T23:05:17.847108"
     }
   ]
 }

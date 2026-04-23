@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
   Trophy, ArrowLeft, Save, FileDown, Sparkles, ShieldAlert,
-  TrendingUp, Scale, Lightbulb, ListChecks, AlertTriangle, Zap,
+  TrendingUp, Scale, Zap, BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { analyzeDecision, saveDecision, getDecision, getGuestId } from '@/lib/api';
+import { saveDecision, getDecision, getGuestId } from '@/lib/api';
+import { scoreAndRank, confidenceLevel } from '@/lib/scoring';
 import ScoreBarChart from '@/components/results/ScoreBarChart';
 import OptionCard from '@/components/results/OptionCard';
 import BestOptionHero from '@/components/results/BestOptionHero';
@@ -22,6 +22,11 @@ import ExportDialog from '@/components/results/ExportDialog';
 import KeyInsights from '@/components/results/KeyInsights';
 import ExecutionPlanCard from '@/components/results/ExecutionPlanCard';
 import PlanBCard from '@/components/results/PlanBCard';
+import BiasAlerts from '@/components/results/BiasAlerts';
+import AssumptionsCard from '@/components/results/AssumptionsCard';
+import EvaluationMatrix from '@/components/results/EvaluationMatrix';
+import RiskScenarios from '@/components/results/RiskScenarios';
+import FutureImpact from '@/components/results/FutureImpact';
 
 const useQuery = () => {
   const { search } = useLocation();
@@ -35,11 +40,8 @@ const Results = () => {
   const [state, setState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [whatIfResult, setWhatIfResult] = useState(null);
-  const [whatIfLoading, setWhatIfLoading] = useState(false);
   const [savedId, setSavedId] = useState(id || null);
   const [exportOpen, setExportOpen] = useState(false);
-  const reportRef = useRef(null);
 
   useEffect(() => {
     const load = async () => {
@@ -73,24 +75,20 @@ const Results = () => {
     load();
   }, [id, navigate]);
 
-  const result = whatIfResult || state?.result;
-  const options = result?.options || [];
-  const bestId = result?.best_option_id;
-  const best = options.find((o) => o.id === bestId) || options[0];
-  const ranked = [...options].sort((a, b) => b.score - a.score);
+  const result = state?.result;
+  const factorsInput = result?.factors_input || [];
+  const rawOptions = result?.options || [];
 
-  const runWhatIf = async (updatedAnswers) => {
-    setWhatIfLoading(true);
-    try {
-      const res = await analyzeDecision(state.decision, updatedAnswers);
-      setWhatIfResult(res);
-      toast.success('What-if analysis updated');
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || 'What-if failed');
-    } finally {
-      setWhatIfLoading(false);
-    }
-  };
+  // Client-side computed ranking using user weights (fallback to AI score if no factors)
+  const ranked = useMemo(() => {
+    if (factorsInput.length > 0) return scoreAndRank(rawOptions, factorsInput);
+    return [...rawOptions].sort((a, b) => (b.score || 0) - (a.score || 0))
+      .map((o, i) => ({ ...o, computed_score: o.score, computed_rank: i + 1 }));
+  }, [rawOptions, factorsInput]);
+
+  const bestId = ranked[0]?.id || result?.best_option_id;
+  const best = ranked.find((o) => o.id === bestId) || ranked[0];
+  const confLvl = confidenceLevel(result?.confidence);
 
   const handleSave = async () => {
     if (!state) return;
@@ -122,7 +120,6 @@ const Results = () => {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="lg:col-span-8 space-y-4">
             <div className="h-48 rounded-2xl shimmer" />
-            <div className="h-28 rounded-2xl shimmer" />
             <div className="h-28 rounded-2xl shimmer" />
           </div>
           <div className="lg:col-span-4 space-y-4">
@@ -181,15 +178,22 @@ const Results = () => {
       <Tabs defaultValue="overview">
         <TabsList className="mb-6 flex flex-wrap">
           <TabsTrigger value="overview" data-testid="results-tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="evaluation" data-testid="results-tab-evaluation">Evaluation</TabsTrigger>
+          <TabsTrigger value="risk" data-testid="results-tab-risk">Risk</TabsTrigger>
+          <TabsTrigger value="future" data-testid="results-tab-future">Future</TabsTrigger>
           <TabsTrigger value="plan" data-testid="results-tab-plan">Execution plan</TabsTrigger>
           <TabsTrigger value="compare" data-testid="results-tab-compare">Compare</TabsTrigger>
           <TabsTrigger value="whatif" data-testid="results-tab-whatif">What-if</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
-          <div ref={reportRef} className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             <div className="space-y-6 lg:col-span-8">
               {best && <BestOptionHero best={best} reasoning={result?.reasoning} confidence={result?.confidence} />}
+
+              {Array.isArray(result?.bias_flags) && result.bias_flags.length > 0 && (
+                <BiasAlerts flags={result.bias_flags} />
+              )}
 
               {Array.isArray(result?.key_insights) && result.key_insights.length > 0 && (
                 <KeyInsights insights={result.key_insights} />
@@ -199,13 +203,17 @@ const Results = () => {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h3 className="text-base font-semibold">Score breakdown</h3>
-                    <p className="text-xs text-muted-foreground">Higher is better. Scores reflect fit to your answers.</p>
+                    <p className="text-xs text-muted-foreground">
+                      {factorsInput.length > 0
+                        ? 'Weighted scores from your priorities × AI ratings.'
+                        : 'AI scores reflect overall fit.'}
+                    </p>
                   </div>
                   <Badge variant="secondary" className="rounded-full">
-                    {options.length} options
+                    {ranked.length} options
                   </Badge>
                 </div>
-                <ScoreBarChart options={options} bestId={bestId} />
+                <ScoreBarChart options={ranked} bestId={bestId} />
               </Card>
 
               <div className="space-y-3" data-testid="results-ranked-options">
@@ -214,11 +222,6 @@ const Results = () => {
                   <OptionCard key={o.id} option={o} rank={i + 1} isBest={o.id === bestId} />
                 ))}
               </div>
-
-              <Card className="rounded-2xl border-border/70 bg-card/60 p-5 sm:p-6">
-                <h3 className="mb-3 text-base font-semibold">Pros & Cons comparison</h3>
-                <ProsConsTable options={ranked} />
-              </Card>
             </div>
 
             {/* Right rail */}
@@ -231,11 +234,21 @@ const Results = () => {
                       {result?.confidence ?? 0}<span className="text-base text-muted-foreground">%</span>
                     </div>
                   </div>
-                  <Sparkles className="h-5 w-5 text-primary" />
+                  <Badge
+                    variant="secondary"
+                    className={`rounded-full ${
+                      confLvl.tone === 'emerald' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' :
+                      confLvl.tone === 'amber' ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' :
+                      'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                    }`}
+                    data-testid="results-confidence-level"
+                  >
+                    {confLvl.label}
+                  </Badge>
                 </div>
                 <Progress value={result?.confidence ?? 0} className="mt-4 h-2" />
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Confidence reflects how decisive the AI&apos;s recommendation is given your inputs.
+                  How decisive the AI is given your inputs.
                 </p>
               </Card>
 
@@ -248,6 +261,10 @@ const Results = () => {
                 </p>
               </Card>
 
+              {Array.isArray(result?.assumptions) && result.assumptions.length > 0 && (
+                <AssumptionsCard assumptions={result.assumptions} />
+              )}
+
               {result?.plan_b && (
                 <PlanBCard planB={result.plan_b} trigger={result.plan_b_trigger} />
               )}
@@ -255,8 +272,8 @@ const Results = () => {
               <Card className="rounded-2xl border-border/70 bg-card/60 p-5">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Quick stats</div>
                 <div className="mt-3 grid grid-cols-3 gap-3 text-center">
-                  <Stat label="Options" value={options.length} icon={TrendingUp} />
-                  <Stat label="Top score" value={best?.score ?? '-'} icon={Trophy} />
+                  <Stat label="Options" value={ranked.length} icon={TrendingUp} />
+                  <Stat label="Top score" value={best?.computed_score ?? best?.score ?? '-'} icon={Trophy} />
                   <Stat label="Risk" value={best?.risk_level ?? '-'} icon={ShieldAlert} />
                 </div>
               </Card>
@@ -264,12 +281,31 @@ const Results = () => {
           </div>
         </TabsContent>
 
+        <TabsContent value="evaluation">
+          {factorsInput.length > 0 ? (
+            <EvaluationMatrix options={ranked} factors={factorsInput} bestId={bestId} />
+          ) : (
+            <Card className="rounded-2xl border-border/70 bg-card/60 p-5 sm:p-6" data-testid="results-pros-cons-table">
+              <h3 className="mb-3 text-base font-semibold">Pros & Cons comparison</h3>
+              <ProsConsTable options={ranked} />
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="risk">
+          <RiskScenarios options={ranked} bestId={bestId} />
+        </TabsContent>
+
+        <TabsContent value="future">
+          <FutureImpact options={ranked} bestId={bestId} />
+        </TabsContent>
+
         <TabsContent value="plan">
           {result?.execution_plan ? (
             <ExecutionPlanCard plan={result.execution_plan} best={best} />
           ) : (
             <Card className="rounded-2xl border-border/70 bg-card/60 p-8 text-center" data-testid="results-no-execution-plan">
-              <Lightbulb className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
+              <BarChart3 className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">No execution plan was returned for this analysis.</p>
             </Card>
           )}
@@ -281,12 +317,9 @@ const Results = () => {
 
         <TabsContent value="whatif">
           <WhatIfPanel
-            decision={state.decision}
-            answers={state.answers}
-            onRun={runWhatIf}
-            loading={whatIfLoading}
-            currentResult={result}
-            originalResult={state.result}
+            options={rawOptions}
+            factorsInput={factorsInput}
+            bestId={bestId}
           />
         </TabsContent>
       </Tabs>
@@ -294,7 +327,7 @@ const Results = () => {
       <ExportDialog
         open={exportOpen}
         onOpenChange={setExportOpen}
-        data={{ ...state, result }}
+        data={{ ...state, result: { ...result, ranked } }}
       />
     </section>
   );

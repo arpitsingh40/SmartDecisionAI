@@ -1,38 +1,42 @@
 [
   {
-    "content": "Phase 3: Install json-repair lib; implement server-side JSON repair fallback",
+    "content": "Phase 4: Backend - /suggest-factors + extended schema + 'Do nothing' option + bias/assumptions",
     "status": "completed"
   },
   {
-    "content": "Phase 3: Upgrade AI to Decision Intelligence framework",
+    "content": "Phase 4: Backend - conversational follow-up tone",
     "status": "completed"
   },
   {
-    "content": "Phase 3: Implement email/password auth (bcrypt + JWT 30d) + scope decisions",
+    "content": "Phase 4: Frontend - client-side scoring engine (weights x ratings)",
     "status": "completed"
   },
   {
-    "content": "Phase 3: Frontend AuthContext + Login/Signup page + token header interceptor",
+    "content": "Phase 4: Frontend - Priorities wizard step (AI-suggested factors + sliders + custom add)",
     "status": "completed"
   },
   {
-    "content": "Phase 3: Upgrade Results UI for new fields (Key Insights, Execution Plan, Plan B, expanded option details)",
+    "content": "Phase 4: Frontend - Evaluation Matrix (heat map, editable ratings override)",
     "status": "completed"
   },
   {
-    "content": "Phase 3: Wizard draft auto-save to localStorage (resume on refresh)",
+    "content": "Phase 4: Frontend - Scoring chart (client-side recompute)",
     "status": "completed"
   },
   {
-    "content": "Phase 3: Duplicate past decision (from saved page -> prefill wizard)",
+    "content": "Phase 4: Frontend - Risk Scenarios + Future Impact tabs",
     "status": "completed"
   },
   {
-    "content": "Phase 3: Deeper what-if (debounced live scoring + sensitivity insights)",
+    "content": "Phase 4: Frontend - Bias Alerts banner + Assumptions card",
     "status": "completed"
   },
   {
-    "content": "Phase 3: End to End Testing via Testing Agent - 95% backend, 85% frontend, 100% mobile",
+    "content": "Phase 4: Frontend - REWRITE What-if for client-side weight sliders (instant recompute)",
     "status": "completed"
+  },
+  {
+    "content": "Phase 4: E2E Testing via Testing Agent",
+    "status": "in_progress"
   }
 ]

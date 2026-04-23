@@ -14,9 +14,11 @@ from datetime import datetime, timezone
 from ai_service import (
     generate_followups,
     analyze_decision,
+    suggest_factors,
     AnalyzePayload,
     FollowUpsResponse,
     DecisionResult,
+    SuggestFactorsResponse,
 )
 from auth_service import (
     SignupRequest,
@@ -205,6 +207,16 @@ async def api_followups(payload: DecisionContextRequest):
         raise HTTPException(status_code=502, detail=f"AI service error: {str(e)[:200]}")
 
 
+@api_router.post("/decisions/suggest-factors", response_model=SuggestFactorsResponse)
+async def api_suggest_factors(payload: DecisionContextRequest):
+    try:
+        result = await suggest_factors(payload.decision)
+        return result
+    except Exception as e:
+        logger.exception("suggest-factors error")
+        raise HTTPException(status_code=502, detail=f"AI service error: {str(e)[:200]}")
+
+
 # Async analyze job store (in-memory, single-worker safe).
 _analyze_jobs: Dict[str, Dict[str, Any]] = {}
 _JOB_TTL_SECONDS = 900
@@ -221,9 +233,9 @@ def _prune_old_jobs() -> None:
         _analyze_jobs.pop(jid, None)
 
 
-async def _run_analyze_job(job_id: str, decision: str, answers: List[Dict[str, Any]]):
+async def _run_analyze_job(job_id: str, decision: str, answers: List[Dict[str, Any]], factors: List[Dict[str, Any]]):
     try:
-        result = await analyze_decision(decision, answers)
+        result = await analyze_decision(decision, answers, factors=factors)
         job = _analyze_jobs.get(job_id)
         if job is None:
             return
@@ -244,7 +256,8 @@ async def _run_analyze_job(job_id: str, decision: str, answers: List[Dict[str, A
 async def api_analyze(payload: AnalyzePayload):
     """Synchronous analyze — small/quick decisions."""
     try:
-        result = await analyze_decision(payload.decision, payload.answers)
+        factors = [f.model_dump() for f in (payload.factors or [])]
+        result = await analyze_decision(payload.decision, payload.answers, factors=factors)
         return result
     except Exception as e:
         logger.exception("analyze error")
@@ -260,7 +273,8 @@ async def api_analyze_start(payload: AnalyzePayload, background_tasks: Backgroun
         "created_at": datetime.now(timezone.utc),
         "decision": payload.decision,
     }
-    asyncio.create_task(_run_analyze_job(job_id, payload.decision, payload.answers))
+    factors = [f.model_dump() for f in (payload.factors or [])]
+    asyncio.create_task(_run_analyze_job(job_id, payload.decision, payload.answers, factors))
     return {"job_id": job_id, "status": "pending"}
 
 

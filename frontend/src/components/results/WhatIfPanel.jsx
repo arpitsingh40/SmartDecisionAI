@@ -1,155 +1,128 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, RotateCcw, Wand2, Zap, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { RotateCcw, TrendingUp, TrendingDown, Minus, Zap, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
+import ScoreBarChart from '@/components/results/ScoreBarChart';
+import { normalizeWeights, scoreAndRank } from '@/lib/scoring';
 
-const WhatIfPanel = ({ decision, answers, onRun, loading, currentResult, originalResult }) => {
-  const [mutated, setMutated] = useState(() => JSON.parse(JSON.stringify(answers || [])));
-  const [autoRun, setAutoRun] = useState(false);
-  const debounceRef = useRef(null);
+/**
+ * Fully client-side What-if:
+ * - Sliders adjust factor weights
+ * - Scores recompute INSTANTLY (no AI call)
+ * - Sensitivity note: detects if best option flipped vs original weights
+ */
+const WhatIfPanel = ({ options, factorsInput, bestId }) => {
+  const safeFactors = Array.isArray(factorsInput) ? factorsInput : [];
+  const [weights, setWeights] = useState(() => safeFactors.map((f) => ({ ...f, weight: Number(f.weight) || 0 })));
 
-  const setAt = (i, value) => {
-    setMutated((arr) => {
-      const copy = [...arr];
-      copy[i] = { ...copy[i], answer: value };
-      return copy;
-    });
-  };
+  const recomputed = useMemo(() => scoreAndRank(options, weights), [options, weights]);
+  const originalRanked = useMemo(() => scoreAndRank(options, safeFactors), [options, safeFactors]);
 
-  // Debounced auto re-run when enabled
-  useEffect(() => {
-    if (!autoRun) return;
-    if (loading) return;
-    // only run if something actually changed
-    const changed = JSON.stringify(mutated) !== JSON.stringify(answers);
-    if (!changed) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      onRun(mutated);
-    }, 1200);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mutated, autoRun]);
+  const newBestId = recomputed[0]?.id;
+  const originalBestId = originalRanked[0]?.id || bestId;
+
+  const flipped = newBestId && originalBestId && newBestId !== originalBestId;
 
   const deltas = useMemo(() => {
-    if (!currentResult || !originalResult) return {};
     const map = {};
-    (currentResult.options || []).forEach((o) => {
-      const orig = (originalResult.options || []).find((x) => x.title === o.title);
-      if (orig) {
-        map[o.title] = {
-          delta: o.score - orig.score,
-          original: orig.score,
-          current: o.score,
-        };
-      }
+    originalRanked.forEach((o) => {
+      const cur = recomputed.find((x) => x.id === o.id);
+      if (cur) map[o.id] = cur.computed_score - o.computed_score;
     });
     return map;
-  }, [currentResult, originalResult]);
+  }, [recomputed, originalRanked]);
 
-  // Sensitivity = the answer whose change correlates most with best-option-change (heuristic label)
-  const sensitivityNote = useMemo(() => {
-    if (!currentResult || !originalResult) return null;
-    // Compare best_option_id to detect if the optimal choice flipped
-    if (currentResult.best_option_id !== originalResult.best_option_id) {
-      const newBest = (currentResult.options || []).find((o) => o.id === currentResult.best_option_id);
-      const oldBest = (originalResult.options || []).find((o) => o.id === originalResult.best_option_id);
-      return {
-        kind: 'flip',
-        text: `The best option flipped: from “${oldBest?.title || '—'}” to “${newBest?.title || '—'}”.`,
-      };
-    }
-    const bigSwings = Object.entries(deltas).filter(([, v]) => Math.abs(v.delta) >= 10);
-    if (bigSwings.length) {
-      return {
-        kind: 'swing',
-        text: `${bigSwings.length} option(s) moved by 10+ points. The ranking is sensitive to your recent changes.`,
-      };
-    }
-    if (Object.keys(deltas).length) {
-      return {
-        kind: 'stable',
-        text: 'Scores are stable within a few points. Your decision is robust to small input changes.',
-      };
-    }
-    return null;
-  }, [currentResult, originalResult, deltas]);
+  const setWeight = (i, v) =>
+    setWeights((prev) => prev.map((f, idx) => (idx === i ? { ...f, weight: v } : f)));
+
+  const reset = () => setWeights(safeFactors.map((f) => ({ ...f, weight: Number(f.weight) || 0 })));
+
+  const normalized = normalizeWeights(weights);
+
+  if (!safeFactors.length) {
+    return (
+      <Card className="rounded-2xl border-border/70 bg-card/60 p-8 text-center" data-testid="whatif-no-factors">
+        <Sparkles className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">This decision has no weighted factors. What‑if requires factors from the wizard’s priorities step.</p>
+      </Card>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12" data-testid="results-whatif-panel">
-      <Card className="rounded-2xl border-border/70 bg-card/60 p-5 sm:p-6 lg:col-span-7">
+      <Card className="rounded-2xl border-border/70 bg-card/60 p-5 sm:p-6 lg:col-span-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-base font-semibold">Adjust your answers</h3>
-            <p className="text-xs text-muted-foreground">Tweak values and re‑analyze. Turn on Live mode to auto‑rerun after changes.</p>
+            <h3 className="text-base font-semibold">Adjust your priorities</h3>
+            <p className="text-xs text-muted-foreground">Scores recompute instantly — no AI call needed.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 rounded-full border border-border/60 bg-background/40 px-3 py-1.5 text-xs">
-              <Zap className="h-3.5 w-3.5" /> Live
-              <Switch checked={autoRun} onCheckedChange={setAutoRun} data-testid="whatif-live-toggle" />
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setMutated(JSON.parse(JSON.stringify(answers || [])))}
-              className="gap-1.5"
-              data-testid="whatif-reset-button"
-            >
-              <RotateCcw className="h-3.5 w-3.5" /> Reset
-            </Button>
-            <Button
-              onClick={() => onRun(mutated)}
-              disabled={loading}
-              className="gap-2"
-              data-testid="whatif-run-button"
-            >
-              {loading ? <Wand2 className="h-4 w-4 animate-pulse" /> : <Sparkles className="h-4 w-4" />}
-              {loading ? 'Running…' : 'Re‑analyze'}
-            </Button>
-          </div>
+          <Button variant="ghost" size="sm" onClick={reset} className="gap-1.5" data-testid="whatif-reset-button">
+            <RotateCcw className="h-3.5 w-3.5" /> Reset
+          </Button>
         </div>
-        <div className="mt-5 space-y-4">
-          {(mutated || []).map((a, i) => (
-            <div key={i} className="rounded-xl border border-border/60 bg-background/40 p-4">
-              <div className="mb-2 text-sm font-medium">{a.question}</div>
-              <WhatIfInput answer={a} onChange={(v) => setAt(i, v)} />
+        <div className="mt-5 space-y-3">
+          {weights.map((f, i) => (
+            <div key={f.name} className="rounded-xl border border-border/60 bg-background/40 p-3">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">{f.name}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {Math.round((normalized[i]?.norm || 0) * 100)}% of total
+                  </div>
+                </div>
+                <div className="shrink-0 rounded-full bg-primary/15 px-2.5 py-0.5 text-sm font-semibold text-primary tabular-nums">
+                  {Number(f.weight) || 0}
+                </div>
+              </div>
+              <Slider
+                className="mt-3"
+                min={0}
+                max={100}
+                step={5}
+                value={[Number(f.weight) || 0]}
+                onValueChange={(arr) => setWeight(i, arr[0])}
+                data-testid={`whatif-weight-slider-${i}`}
+              />
             </div>
           ))}
         </div>
       </Card>
 
-      <Card className="rounded-2xl border-border/70 bg-card/60 p-5 sm:p-6 lg:col-span-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">Live scores</h3>
-          {typeof currentResult?.confidence === 'number' && (
-            <Badge variant="secondary" className="rounded-full">
-              Confidence {currentResult.confidence}%
+      <Card className="rounded-2xl border-border/70 bg-card/60 p-5 sm:p-6 lg:col-span-7" data-testid="whatif-live-scores-card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold">Live scores</h3>
+            <p className="text-xs text-muted-foreground">Sensitivity to the weights you care about.</p>
+          </div>
+          {flipped && (
+            <Badge className="rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400" variant="secondary">
+              <Zap className="mr-1 h-3 w-3" /> Best option flipped
             </Badge>
           )}
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">Differences vs your original analysis.</p>
+
+        <div className="mt-4">
+          <ScoreBarChart options={recomputed} bestId={newBestId} />
+        </div>
+
         <div className="mt-4 space-y-2">
-          {(currentResult?.options || []).map((o) => {
-            const d = deltas[o.title]?.delta ?? 0;
+          {recomputed.map((o) => {
+            const d = deltas[o.id] ?? 0;
             const color = d > 0 ? 'text-emerald-500' : d < 0 ? 'text-rose-500' : 'text-muted-foreground';
             const Icon = d > 0 ? TrendingUp : d < 0 ? TrendingDown : Minus;
             return (
               <motion.div
                 key={o.id}
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2"
                 data-testid={`whatif-score-${o.id}`}
               >
                 <div className="min-w-0 flex-1 truncate text-sm">{o.title}</div>
-                <div className="text-sm font-semibold tabular-nums">{o.score}</div>
+                <div className="text-sm font-semibold tabular-nums">{o.computed_score}</div>
                 <div className={`inline-flex w-16 items-center justify-end gap-1 text-right text-xs tabular-nums ${color}`}>
                   <Icon className="h-3 w-3" />
                   <span>{d > 0 ? `+${d}` : d}</span>
@@ -158,47 +131,22 @@ const WhatIfPanel = ({ decision, answers, onRun, loading, currentResult, origina
             );
           })}
         </div>
-        {sensitivityNote && (
-          <div
-            className={`mt-4 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
-              sensitivityNote.kind === 'flip'
-                ? 'border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-300'
-                : sensitivityNote.kind === 'swing'
-                ? 'border-primary/40 bg-primary/5 text-foreground/90'
-                : 'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400'
-            }`}
-            data-testid="whatif-sensitivity-note"
-          >
-            {sensitivityNote.text}
-          </div>
-        )}
+
+        <div
+          className={`mt-4 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
+            flipped
+              ? 'border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-300'
+              : 'border-emerald-500/30 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400'
+          }`}
+          data-testid="whatif-sensitivity-note"
+        >
+          {flipped
+            ? `Changing your weights flips the best option — your decision is sensitive to “${weights.map((w) => w.name).join(', ')}”.`
+            : `The recommendation is stable across your current weight tweaks — robust decision.`}
+        </div>
       </Card>
     </div>
   );
-};
-
-const WhatIfInput = ({ answer, onChange }) => {
-  const { type, answer: v } = answer;
-  if (type === 'slider' || typeof v === 'number') {
-    return (
-      <div>
-        <div className="mb-2 text-sm tabular-nums text-primary">{Number(v)}</div>
-        <Slider
-          min={0}
-          max={10}
-          step={1}
-          value={[Number(v) || 0]}
-          onValueChange={(arr) => onChange(arr[0])}
-        />
-      </div>
-    );
-  }
-  if (type === 'multi_choice' && Array.isArray(v)) {
-    return (
-      <Input value={v.join(', ')} onChange={(e) => onChange(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} />
-    );
-  }
-  return <Input value={String(v ?? '')} onChange={(e) => onChange(e.target.value)} />;
 };
 
 export default WhatIfPanel;

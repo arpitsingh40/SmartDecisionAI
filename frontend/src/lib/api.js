@@ -73,8 +73,12 @@ export async function fetchFollowUps(decision) {
   return data;
 }
 
-export async function analyzeDecision(decision, answers, onProgress) {
-  const { data: start } = await api.post('/decisions/analyze/start', { decision, answers });
+export async function analyzeDecision(decision, answers, factors, onProgress) {
+  const { data: start } = await api.post('/decisions/analyze/start', {
+    decision,
+    answers,
+    factors: (factors || []).map((f) => ({ name: f.name, weight: Number(f.weight) || 0 })),
+  });
   const jobId = start.job_id;
   const deadline = Date.now() + 180000; // 3 min hard cap
   let delay = 1200;

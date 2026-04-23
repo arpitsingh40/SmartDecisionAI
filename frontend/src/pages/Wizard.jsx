@@ -23,57 +23,64 @@ import {
 } from '@/lib/api';
 import { stepVariants } from '@/lib/motion';
 import AnalysisLoading from '@/components/wizard/AnalysisLoading';
+import PrioritiesStep from '@/components/wizard/PrioritiesStep';
 
 const Wizard = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [phase, setPhase] = useState('decision'); // 'decision' | 'loading-qs' | 'questions' | 'review' | 'analyzing'
+  // phases: 'decision' | 'priorities' | 'loading-qs' | 'questions' | 'review' | 'analyzing'
+  const [phase, setPhase] = useState('decision');
   const [decision, setDecision] = useState('');
+  const [factors, setFactors] = useState([]); // [{name, description, weight}]
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({}); // qid -> value
   const [stepIndex, setStepIndex] = useState(0);
   const [error, setError] = useState(null);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
+  const [resumeDraft, setResumeDraft] = useState(null);
 
-  // Load prefill (from duplicate) or draft (from previous session)
   useEffect(() => {
     ensureGuestSession().catch(() => {});
 
-    // 1) Duplicate prefill from SavedDecisions
+    // Prefill from duplicate?
     const prefill = location.state?.prefill;
     if (prefill) {
       setDecision(prefill.decision || '');
+      if (Array.isArray(prefill.factors) && prefill.factors.length) {
+        setFactors(prefill.factors);
+      }
       if (Array.isArray(prefill.questions) && prefill.questions.length) {
         setQuestions(prefill.questions);
         setAnswers(prefill.answers || {});
         setPhase('questions');
         setStepIndex(0);
+      } else if (prefill.factors?.length) {
+        setPhase('priorities');
       }
       return;
     }
 
-    // 2) Existing draft
+    // Draft?
     const draft = loadWizardDraft();
-    if (draft && (draft.decision || (draft.questions && draft.questions.length))) {
+    if (draft && (draft.decision || draft.questions?.length)) {
       setShowResumeBanner(true);
-      // keep draft in memory, but don't auto-apply until the user confirms
-      // stash it on the element so resume can read it quickly
       setResumeDraft(draft);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [resumeDraft, setResumeDraft] = useState(null);
-
   const resumeFromDraft = () => {
     if (!resumeDraft) return;
     setDecision(resumeDraft.decision || '');
+    setFactors(resumeDraft.factors || []);
     setQuestions(resumeDraft.questions || []);
     setAnswers(resumeDraft.answers || {});
     const qs = resumeDraft.questions || [];
     if (qs.length) {
       setStepIndex(Math.min(resumeDraft.stepIndex ?? 0, qs.length - 1));
       setPhase(resumeDraft.phase === 'review' ? 'review' : 'questions');
+    } else if ((resumeDraft.factors || []).length) {
+      setPhase('priorities');
     } else {
       setPhase('decision');
     }
@@ -87,22 +94,32 @@ const Wizard = () => {
     setShowResumeBanner(false);
   };
 
-  // Auto-save draft on any meaningful change
+  // Auto-save draft
   useEffect(() => {
     if (phase === 'analyzing' || phase === 'loading-qs') return;
-    if (!decision && !questions.length) return;
-    saveWizardDraft({ decision, questions, answers, stepIndex, phase });
-  }, [decision, questions, answers, stepIndex, phase]);
+    if (!decision && !questions.length && !factors.length) return;
+    saveWizardDraft({ decision, factors, questions, answers, stepIndex, phase });
+  }, [decision, factors, questions, answers, stepIndex, phase]);
 
-  const totalSteps = 1 + questions.length + 1; // decision + questions + review
-  const currentStepNum = phase === 'decision' ? 1 : phase === 'questions' ? 2 + stepIndex : totalSteps;
+  // Progress: decision(1) + priorities(1) + N questions + review(1)
+  const totalSteps = 1 + 1 + questions.length + 1;
+  const currentStepNum =
+    phase === 'decision' ? 1 :
+    phase === 'priorities' ? 2 :
+    phase === 'questions' ? 3 + stepIndex :
+    totalSteps;
   const progressPct = Math.round((currentStepNum / totalSteps) * 100);
 
   const handleBeginFollowUps = async () => {
     if (decision.trim().length < 6) {
-      toast.error('Please describe your decision in a bit more detail.');
+      toast.error('Tell me a bit more about your decision.');
       return;
     }
+    // Move to priorities step first
+    setPhase('priorities');
+  };
+
+  const handleBeginQuestions = async () => {
     setPhase('loading-qs');
     setError(null);
     try {
@@ -125,7 +142,7 @@ const Wizard = () => {
     } catch (e) {
       const msg = e?.response?.data?.detail || e.message || 'Failed to load questions';
       setError(msg);
-      setPhase('decision');
+      setPhase('priorities');
       toast.error(msg);
     }
   };
@@ -154,7 +171,7 @@ const Wizard = () => {
       return;
     }
     if (stepIndex > 0) setStepIndex((i) => i - 1);
-    else setPhase('decision');
+    else setPhase('priorities');
   };
 
   const setAnswer = (qid, v) => setAnswers((a) => ({ ...a, [qid]: v }));
@@ -162,6 +179,7 @@ const Wizard = () => {
   const startOver = () => {
     clearWizardDraft();
     setDecision('');
+    setFactors([]);
     setQuestions([]);
     setAnswers({});
     setStepIndex(0);
@@ -176,7 +194,8 @@ const Wizard = () => {
         type: q.type,
         answer: answers[q.id],
       }));
-      const result = await analyzeDecision(decision, normAnswers);
+      const payloadFactors = factors.map((f) => ({ name: f.name, weight: Number(f.weight) || 0 }));
+      const result = await analyzeDecision(decision, normAnswers, payloadFactors);
       const guest_id = getGuestId();
       const title = decision.length > 60 ? decision.slice(0, 57) + '…' : decision;
       try {
@@ -185,18 +204,18 @@ const Wizard = () => {
           title,
           decision,
           answers: normAnswers,
-          result,
+          result: { ...result, factors_input: factors },
         });
         sessionStorage.setItem(
           'sda_current_result',
-          JSON.stringify({ id: saved.id, title, decision, answers: normAnswers, result })
+          JSON.stringify({ id: saved.id, title, decision, answers: normAnswers, result: { ...result, factors_input: factors } })
         );
         clearWizardDraft();
         navigate('/results?id=' + saved.id);
       } catch (e) {
         sessionStorage.setItem(
           'sda_current_result',
-          JSON.stringify({ title, decision, answers: normAnswers, result })
+          JSON.stringify({ title, decision, answers: normAnswers, result: { ...result, factors_input: factors } })
         );
         clearWizardDraft();
         navigate('/results');
@@ -264,19 +283,19 @@ const Wizard = () => {
           <motion.div key="decision" variants={stepVariants} initial="initial" animate="animate" exit="exit">
             <Card className="rounded-2xl border-border/70 bg-card/60 p-6 shadow-[var(--shadow-1)] backdrop-blur sm:p-8">
               <Badge variant="secondary" className="rounded-full">
-                <Sparkles className="mr-1.5 h-3 w-3" /> Let's get specific
+                <Sparkles className="mr-1.5 h-3 w-3" /> Let's start here
               </Badge>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
-                What decision are you making?
+                What decision are you trying to make?
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                One sentence is enough. Include the options you&apos;re weighing if you have any.
+                Just a sentence is enough. Mention the options you&apos;re weighing if you have any.
               </p>
               <Textarea
                 data-testid="wizard-decision-statement-textarea"
                 value={decision}
                 onChange={(e) => setDecision(e.target.value.slice(0, 500))}
-                placeholder="e.g. Should I accept the offer at Stripe or pursue a Master's at CMU?"
+                placeholder="e.g. Should I accept the Stripe offer or pursue a Master's at CMU?"
                 className="mt-5 min-h-[120px] resize-none bg-background/60 text-base"
               />
               <div className="mt-2 text-right text-xs text-muted-foreground">
@@ -298,12 +317,24 @@ const Wizard = () => {
           </motion.div>
         )}
 
+        {phase === 'priorities' && (
+          <motion.div key="priorities" variants={stepVariants} initial="initial" animate="animate" exit="exit">
+            <PrioritiesStep
+              decision={decision}
+              value={factors}
+              onChange={setFactors}
+              onBack={() => setPhase('decision')}
+              onNext={handleBeginQuestions}
+            />
+          </motion.div>
+        )}
+
         {phase === 'loading-qs' && (
           <motion.div key="loading-qs" variants={stepVariants} initial="initial" animate="animate" exit="exit">
             <Card className="rounded-2xl border-border/70 bg-card/60 p-8" data-testid="wizard-loading-questions">
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Wand2 className="h-4 w-4 animate-pulse text-primary" />
-                Crafting smart follow-up questions…
+                Thinking about the right follow-up questions…
               </div>
               <div className="mt-6 space-y-3">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -373,12 +404,28 @@ const Wizard = () => {
                 Ready for the analysis?
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Quick review of your answers. You can edit any of them before running the AI.
+                Quick review. You can edit anything before running the AI.
               </p>
               <div className="mt-6 rounded-xl border border-border/70 bg-background/40 p-4">
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Decision</div>
                 <div className="mt-1 text-sm">{decision}</div>
               </div>
+              {factors.length > 0 && (
+                <div className="mt-3 rounded-xl border border-border/70 bg-background/40 p-4">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Your priorities</div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {factors.map((f) => (
+                      <span key={f.name} className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/40 px-2.5 py-1 text-xs">
+                        <span className="font-medium">{f.name}</span>
+                        <span className="text-muted-foreground tabular-nums">{Number(f.weight) || 0}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <Button variant="ghost" size="sm" className="mt-2 h-7 text-xs" onClick={() => setPhase('priorities')} data-testid="wizard-review-edit-priorities">
+                    Edit priorities
+                  </Button>
+                </div>
+              )}
               <div className="mt-4 space-y-2">
                 {questions.map((q, i) => (
                   <div

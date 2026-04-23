@@ -1,22 +1,23 @@
 import React from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LabelList,
 } from 'recharts';
 
 const ScoreBarChart = ({ options, bestId }) => {
-  const data = [...options]
-    .sort((a, b) => a.score - b.score)
+  const data = [...(options || [])]
+    .sort((a, b) => (a.computed_score ?? a.score) - (b.computed_score ?? b.score))
     .map((o) => ({
-      name: o.title.length > 28 ? o.title.slice(0, 26) + '…' : o.title,
-      score: o.score,
+      name: (o.title || '').length > 28 ? o.title.slice(0, 26) + '…' : o.title,
+      score: Math.round(o.computed_score ?? o.score ?? 0),
       id: o.id,
+      is_do_nothing: o.is_do_nothing,
     }));
 
   const primary = 'hsl(var(--primary))';
   const muted = 'hsl(var(--muted-foreground))';
   const border = 'hsl(var(--border))';
 
-  const height = Math.max(180, data.length * 48);
+  const height = Math.max(200, data.length * 52);
 
   return (
     <div style={{ width: '100%', height }}>
@@ -24,7 +25,7 @@ const ScoreBarChart = ({ options, bestId }) => {
         <BarChart
           data={data}
           layout="vertical"
-          margin={{ top: 8, right: 24, left: 8, bottom: 8 }}
+          margin={{ top: 8, right: 40, left: 8, bottom: 8 }}
         >
           <CartesianGrid stroke={border} strokeOpacity={0.35} horizontal={false} />
           <XAxis
@@ -38,7 +39,7 @@ const ScoreBarChart = ({ options, bestId }) => {
             type="category"
             dataKey="name"
             tick={{ fill: muted, fontSize: 11 }}
-            width={160}
+            width={180}
             axisLine={false}
             tickLine={false}
           />
@@ -54,14 +55,15 @@ const ScoreBarChart = ({ options, bestId }) => {
             }}
             formatter={(v) => [v, 'Score']}
           />
-          <Bar dataKey="score" radius={[0, 8, 8, 0]} animationDuration={700}>
+          <Bar dataKey="score" radius={[0, 8, 8, 0]} animationDuration={600}>
             {data.map((d) => (
               <Cell
                 key={d.id}
                 fill={d.id === bestId ? primary : 'hsl(var(--chart-2))'}
-                fillOpacity={d.id === bestId ? 1 : 0.6}
+                fillOpacity={d.id === bestId ? 1 : d.is_do_nothing ? 0.45 : 0.6}
               />
             ))}
+            <LabelList dataKey="score" position="right" style={{ fill: muted, fontSize: 11 }} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>

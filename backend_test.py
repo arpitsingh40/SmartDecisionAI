@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-Smart Decision AI Phase 3 Backend Testing
-Tests all auth endpoints, decision intelligence features, and new schema
+Smart Decision AI Phase 4 Backend Testing
+Tests all auth endpoints, decision intelligence features, new schema, and Phase 4 features:
+- Factor suggestion endpoint
+- Enhanced analysis with factors
+- New schema fields (factor_ratings, scenarios, future_impact, assumptions, bias_flags)
 """
 import requests
 import sys
@@ -195,14 +198,47 @@ class SmartDecisionAPITester:
                 self.log_test("Follow-ups Quality", False, f"Only {len(questions)} questions generated (expected >=4)")
         return success
 
-    def test_decision_analysis(self):
-        """Test decision analysis with new Decision Intelligence schema"""
-        print("\n🔍 Testing Decision Analysis...")
+    def test_suggest_factors(self):
+        """Test Phase 4 factor suggestion endpoint"""
+        print("\n🔍 Testing Phase 4 - Factor Suggestion...")
+        decision_data = {
+            "decision": "Should I buy a used Toyota Camry or a new Honda Civic?"
+        }
         
-        # First get follow-ups
-        decision_text = "Should I buy an iPhone 16 Pro or a OnePlus 13 as my daily driver?"
+        success, response = self.run_test("Suggest Factors", "POST", "decisions/suggest-factors", 200, decision_data)
+        if success:
+            factors = response.get('factors', [])
+            if len(factors) >= 3:
+                print(f"   Generated {len(factors)} factors")
+                for i, factor in enumerate(factors[:3]):
+                    print(f"   Factor {i+1}: {factor.get('name')} (weight: {factor.get('default_weight')})")
+                    if not factor.get('name') or not factor.get('description'):
+                        self.log_test("Factor Quality", False, f"Factor {i+1} missing name or description")
+                        return False
+                self.log_test("Factor Quality", True)
+                return True
+            else:
+                self.log_test("Factor Count", False, f"Only {len(factors)} factors generated (expected >=3)")
+        return success
+
+    def test_decision_analysis_with_factors(self):
+        """Test decision analysis with Phase 4 factors"""
+        print("\n🔍 Testing Phase 4 - Decision Analysis with Factors...")
+        
+        # First get factors
+        decision_text = "Should I buy a used Toyota Camry or a new Honda Civic?"
         decision_data = {"decision": decision_text}
         
+        success, factor_response = self.run_test("Get Factors for Analysis", "POST", "decisions/suggest-factors", 200, decision_data)
+        if not success:
+            return False
+        
+        factors = factor_response.get('factors', [])
+        if len(factors) < 3:
+            self.log_test("Analysis Setup", False, "Not enough factors for analysis")
+            return False
+        
+        # Get follow-ups
         success, followup_response = self.run_test("Get Follow-ups for Analysis", "POST", "decisions/followups", 200, decision_data)
         if not success:
             return False
@@ -237,16 +273,25 @@ class SmartDecisionAPITester:
                 answers.append({
                     "question": q['question'],
                     "type": q['type'],
-                    "answer": "best camera and reliability"
+                    "answer": "reliability and cost"
                 })
         
-        # Start async analysis
+        # Prepare factors for analysis
+        factor_weights = []
+        for i, factor in enumerate(factors[:4]):  # Use first 4 factors
+            factor_weights.append({
+                "name": factor['name'],
+                "weight": factor.get('default_weight', 50)
+            })
+        
+        # Start async analysis with factors
         analyze_data = {
             "decision": decision_text,
-            "answers": answers
+            "answers": answers,
+            "factors": factor_weights
         }
         
-        success, start_response = self.run_test("Start Analysis Job", "POST", "decisions/analyze/start", 200, analyze_data)
+        success, start_response = self.run_test("Start Analysis Job with Factors", "POST", "decisions/analyze/start", 200, analyze_data)
         if not success:
             return False
         
@@ -262,7 +307,7 @@ class SmartDecisionAPITester:
         start_time = time.time()
         
         while time.time() - start_time < max_wait:
-            time.sleep(2)
+            time.sleep(3)
             success, status_response = self.run_test(f"Check Analysis Status", "GET", f"decisions/analyze/status/{job_id}", 200)
             
             if success:
@@ -271,7 +316,7 @@ class SmartDecisionAPITester:
                 
                 if status == 'completed':
                     result = status_response.get('result', {})
-                    return self.validate_decision_intelligence_schema(result)
+                    return self.validate_phase4_schema(result, factor_weights)
                 elif status == 'failed':
                     error = status_response.get('error', 'Unknown error')
                     self.log_test("Analysis Completion", False, f"Analysis failed: {error}")
@@ -280,12 +325,12 @@ class SmartDecisionAPITester:
         self.log_test("Analysis Timeout", False, f"Analysis did not complete within {max_wait} seconds")
         return False
 
-    def validate_decision_intelligence_schema(self, result):
-        """Validate the new Decision Intelligence schema"""
-        print("\n🔍 Validating Decision Intelligence Schema...")
+    def validate_phase4_schema(self, result, factors):
+        """Validate the Phase 4 Decision Intelligence schema"""
+        print("\n🔍 Validating Phase 4 Decision Intelligence Schema...")
         
         required_fields = ['options', 'best_option_id', 'reasoning', 'confidence', 'goal', 'key_insights']
-        optional_fields = ['execution_plan', 'plan_b', 'plan_b_trigger']
+        phase4_fields = ['assumptions', 'bias_flags', 'factors_used']
         
         # Check top-level fields
         for field in required_fields:
@@ -295,20 +340,65 @@ class SmartDecisionAPITester:
             else:
                 self.log_test(f"Schema - {field}", True)
         
-        # Check options have extended fields
+        # Check Phase 4 fields
+        for field in phase4_fields:
+            if field in result:
+                self.log_test(f"Phase4 Schema - {field}", True)
+            else:
+                self.log_test(f"Phase4 Schema - {field}", False, f"Missing Phase 4 field: {field}")
+        
+        # Check options have Phase 4 extended fields
         options = result.get('options', [])
         if len(options) < 3:
             self.log_test("Schema - Options Count", False, f"Expected >=3 options, got {len(options)}")
             return False
         
-        extended_option_fields = ['success_probability', 'expected_return', 'time_to_result', 'easiness', 'financial_ratio']
+        # Check for "Do nothing" option
+        do_nothing_found = any(opt.get('is_do_nothing') for opt in options)
+        self.log_test("Phase4 Schema - Do Nothing Option", do_nothing_found, "No 'do nothing' option found" if not do_nothing_found else "")
+        
+        phase4_option_fields = ['factor_ratings', 'scenarios', 'future_impact']
         
         for i, option in enumerate(options[:2]):  # Check first 2 options
-            for field in extended_option_fields:
-                if field in option:
-                    self.log_test(f"Schema - Option {i+1} {field}", True)
-                else:
-                    self.log_test(f"Schema - Option {i+1} {field}", False, f"Missing extended field: {field}")
+            # Check factor_ratings
+            factor_ratings = option.get('factor_ratings', {})
+            if factor_ratings:
+                self.log_test(f"Phase4 Schema - Option {i+1} factor_ratings", True)
+                # Check if ratings exist for provided factors
+                factor_names = [f['name'] for f in factors]
+                for factor_name in factor_names:
+                    if factor_name in factor_ratings:
+                        rating = factor_ratings[factor_name]
+                        if isinstance(rating, (int, float)) and 0 <= rating <= 10:
+                            self.log_test(f"Phase4 Schema - Option {i+1} {factor_name} rating", True)
+                        else:
+                            self.log_test(f"Phase4 Schema - Option {i+1} {factor_name} rating", False, f"Invalid rating: {rating}")
+            else:
+                self.log_test(f"Phase4 Schema - Option {i+1} factor_ratings", False, "Missing factor_ratings")
+            
+            # Check scenarios
+            scenarios = option.get('scenarios', {})
+            if scenarios:
+                scenario_fields = ['best_case', 'worst_case', 'most_likely']
+                for field in scenario_fields:
+                    if field in scenarios:
+                        self.log_test(f"Phase4 Schema - Option {i+1} scenario {field}", True)
+                    else:
+                        self.log_test(f"Phase4 Schema - Option {i+1} scenario {field}", False, f"Missing scenario field: {field}")
+            else:
+                self.log_test(f"Phase4 Schema - Option {i+1} scenarios", False, "Missing scenarios")
+            
+            # Check future_impact
+            future_impact = option.get('future_impact', {})
+            if future_impact:
+                future_fields = ['one_year', 'five_year']
+                for field in future_fields:
+                    if field in future_impact:
+                        self.log_test(f"Phase4 Schema - Option {i+1} future {field}", True)
+                    else:
+                        self.log_test(f"Phase4 Schema - Option {i+1} future {field}", False, f"Missing future field: {field}")
+            else:
+                self.log_test(f"Phase4 Schema - Option {i+1} future_impact", False, "Missing future_impact")
         
         # Check execution plan if present
         execution_plan = result.get('execution_plan')
@@ -319,23 +409,28 @@ class SmartDecisionAPITester:
                     self.log_test(f"Schema - Execution Plan {field}", True)
                 else:
                     self.log_test(f"Schema - Execution Plan {field}", False, f"Missing execution plan field: {field}")
-            
-            # Check steps structure
-            steps = execution_plan.get('steps', [])
-            if steps and len(steps) >= 3:
-                step = steps[0]
-                step_fields = ['step', 'action', 'timeline', 'priority']
-                for field in step_fields:
-                    if field in step:
-                        self.log_test(f"Schema - Execution Step {field}", True)
-                    else:
-                        self.log_test(f"Schema - Execution Step {field}", False, f"Missing step field: {field}")
+        
+        # Check assumptions
+        assumptions = result.get('assumptions', [])
+        if assumptions:
+            print(f"   Assumptions: {len(assumptions)} found")
+        
+        # Check bias_flags
+        bias_flags = result.get('bias_flags', [])
+        if bias_flags:
+            print(f"   Bias Flags: {len(bias_flags)} found")
+            for flag in bias_flags:
+                if 'title' in flag and 'message' in flag and 'severity' in flag:
+                    self.log_test(f"Phase4 Schema - Bias Flag Structure", True)
+                else:
+                    self.log_test(f"Phase4 Schema - Bias Flag Structure", False, "Invalid bias flag structure")
         
         print(f"   Goal: {result.get('goal', 'N/A')[:100]}...")
         print(f"   Key Insights: {len(result.get('key_insights', []))} insights")
         print(f"   Options: {len(options)} options")
         print(f"   Best Option: {result.get('best_option_id', 'N/A')}")
         print(f"   Confidence: {result.get('confidence', 'N/A')}%")
+        print(f"   Factors Used: {result.get('factors_used', [])}")
         
         return True
 
@@ -429,7 +524,7 @@ class SmartDecisionAPITester:
 
     def run_all_tests(self):
         """Run all backend tests"""
-        print("🚀 Starting Smart Decision AI Phase 3 Backend Tests")
+        print("🚀 Starting Smart Decision AI Phase 4 Backend Tests")
         print(f"Testing against: {self.base_url}")
         print("=" * 60)
         
@@ -449,7 +544,10 @@ class SmartDecisionAPITester:
         
         # Decision engine tests
         self.test_followups_generation()
-        self.test_decision_analysis()
+        
+        # Phase 4 specific tests
+        self.test_suggest_factors()
+        self.test_decision_analysis_with_factors()
         
         # Saved decisions tests
         self.test_save_decision()

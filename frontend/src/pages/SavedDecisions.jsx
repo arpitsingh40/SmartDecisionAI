@@ -60,7 +60,6 @@ const SavedDecisions = () => {
     try {
       const guestId = getGuestId();
       const doc = await getDecision(id, guestId);
-      // Rebuild wizard question list + answers from saved answers array
       const questions = (doc.answers || []).map((a, i) => ({
         id: `q_dup_${i}`,
         question: a.question,
@@ -71,12 +70,15 @@ const SavedDecisions = () => {
       questions.forEach((q, i) => {
         answers[q.id] = doc.answers[i].answer;
       });
+      // Preserve factors if saved
+      const factors = doc.result?.factors_input || [];
       navigate('/wizard', {
         state: {
           prefill: {
             decision: doc.decision,
             questions,
             answers,
+            factors,
           },
         },
       });
