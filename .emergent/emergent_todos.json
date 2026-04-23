@@ -1,0 +1,46 @@
+[
+  {
+    "content": "Phase 1: Get Emergent LLM integration playbook",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 1: Create POC test script validating structured JSON output (follow-ups + decision analysis)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 1: Run POC and fix until all core user stories pass (Claude Sonnet 4.5 passes 3/3)",
+    "status": "completed"
+  },
+  {
+    "content": "Phase 2: Get design guidelines from design_agent",
+    "status": "in_progress"
+  },
+  {
+    "content": "Phase 2: Install missing frontend packages (framer-motion, jspdf, html2canvas)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Implement backend (FastAPI endpoints, Motor, guest sessions, decisions CRUD, LLM service)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: Implement frontend (Landing + Wizard + Results Dashboard + Saved Decisions + PDF export)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: All user stories covered in Development",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 2: End to End Testing using Testing Agent",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 3: Interactive Tools (what-if + side-by-side comparison) + UX polish",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 3: E2E Testing using Testing Agent",
+    "status": "pending"
+  }
+]

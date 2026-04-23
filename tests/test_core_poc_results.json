@@ -1,0 +1,182 @@
+[
+  {
+    "provider": "openai",
+    "model": "gpt-5",
+    "cases": [
+      {
+        "decision": "Should I quit my stable software job at a bank to join an early-stage AI startup?",
+        "followups_count": 7,
+        "followups_types": [
+          "multi_choice",
+          "single_choice",
+          "slider",
+          "text"
+        ],
+        "analyze_error": "Failed to generate chat completion: litellm.BadGatewayError: BadGatewayError: OpenAIException - Error code: 502"
+      },
+      {
+        "decision": "Should I pursue a Master's in Computer Science abroad or start working now with my Bachelor's?",
+        "followups_count": 7,
+        "followups_types": [
+          "multi_choice",
+          "single_choice",
+          "slider",
+          "text"
+        ],
+        "analyze_error": "Failed to generate chat completion: litellm.BadGatewayError: BadGatewayError: OpenAIException - Error code: 502"
+      },
+      {
+        "decision": "Should I move from Bangalore to Bengaluru-like remote setup in a smaller city for better quality of life?",
+        "followups_count": 6,
+        "followups_types": [
+          "multi_choice",
+          "single_choice",
+          "slider",
+          "text"
+        ],
+        "analyze_error": "Failed to generate chat completion: litellm.BadRequestError: OpenAIException - Budget has been exceeded! Current cost: 1.0011570000000003, Max budget: 1.001"
+      }
+    ]
+  },
+  {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5-20250929",
+    "cases": [
+      {
+        "decision": "Should I quit my stable software job at a bank to join an early-stage AI startup?",
+        "followups_count": 7,
+        "followups_types": [
+          "multi_choice",
+          "single_choice",
+          "slider",
+          "text"
+        ],
+        "options": [
+          {
+            "id": "opt_1",
+            "title": "Join the startup immediately with 6-month safety net clause",
+            "score": 88,
+            "risk": "Medium"
+          },
+          {
+            "id": "opt_2",
+            "title": "Negotiate hybrid transition: 6 months part-time consulting at bank while starting at startup",
+            "score": 52,
+            "risk": "Low"
+          },
+          {
+            "id": "opt_3",
+            "title": "Stay at bank but negotiate AI/ML rotation or 20% time for AI projects",
+            "score": 45,
+            "risk": "Low"
+          },
+          {
+            "id": "opt_4",
+            "title": "Counter-offer startup: $130k base + 0.6% equity + 1-year cliff acceleration clause",
+            "score": 82,
+            "risk": "Medium"
+          },
+          {
+            "id": "opt_5",
+            "title": "Join startup with freelance side income plan to maintain financial buffer",
+            "score": 75,
+            "risk": "Medium"
+          }
+        ],
+        "best_option_id": "opt_1",
+        "confidence": 85,
+        "best_is_top": true
+      },
+      {
+        "decision": "Should I pursue a Master's in Computer Science abroad or start working now with my Bachelor's?",
+        "followups_count": 7,
+        "followups_types": [
+          "multi_choice",
+          "single_choice",
+          "slider",
+          "text"
+        ],
+        "options": [
+          {
+            "id": "opt_1",
+            "title": "CMU MSCS with Part-Time Research Assistant Role",
+            "score": 92,
+            "risk": "Medium"
+          },
+          {
+            "id": "opt_2",
+            "title": "Accept Current Offer + Self-Funded ETH Zurich MSCS (Deferred 1 Year)",
+            "score": 78,
+            "risk": "Medium"
+          },
+          {
+            "id": "opt_3",
+            "title": "Decline Offer, Grind for FAANG/Unicorn Entry-Level ML Role",
+            "score": 65,
+            "risk": "High"
+          },
+          {
+            "id": "opt_4",
+            "title": "Accept Current Offer + Part-Time TUM Online MSCS (Informatics)",
+            "score": 71,
+            "risk": "Low"
+          },
+          {
+            "id": "opt_5",
+            "title": "Accept Offer, Build 2-Year ML Portfolio, Target Elite MS Programs with Better Aid",
+            "score": 81,
+            "risk": "Medium"
+          }
+        ],
+        "best_option_id": "opt_1",
+        "confidence": 87,
+        "best_is_top": true
+      },
+      {
+        "decision": "Should I move from Bangalore to Bengaluru-like remote setup in a smaller city for better quality of life?",
+        "followups_count": 7,
+        "followups_types": [
+          "multi_choice",
+          "single_choice",
+          "slider",
+          "text"
+        ],
+        "options": [
+          {
+            "id": "opt_1",
+            "title": "Move to Coimbatore (Tamil Nadu)",
+            "score": 88,
+            "risk": "Low"
+          },
+          {
+            "id": "opt_2",
+            "title": "Move to Mysore (Karnataka)",
+            "score": 85,
+            "risk": "Low"
+          },
+          {
+            "id": "opt_3",
+            "title": "Stay in Bangalore, negotiate 3-day WFH + move to cheaper neighborhood",
+            "score": 62,
+            "risk": "Low"
+          },
+          {
+            "id": "opt_4",
+            "title": "Move to Kochi (Kerala)",
+            "score": 74,
+            "risk": "Medium"
+          },
+          {
+            "id": "opt_5",
+            "title": "Trial relocation: 6-month Airbnb in Coimbatore before committing",
+            "score": 79,
+            "risk": "Low"
+          }
+        ],
+        "best_option_id": "opt_1",
+        "confidence": 87,
+        "best_is_top": true
+      }
+    ]
+  }
+]
