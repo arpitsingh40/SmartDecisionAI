@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 
 class SmartDecisionAPITester:
-    def __init__(self, base_url="http://localhost:8001/api"):
+    def __init__(self, base_url="https://decide-pro-1.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.token = None
         self.user_id = None
