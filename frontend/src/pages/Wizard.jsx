@@ -369,28 +369,39 @@ const QuestionInput = ({ q, value, onChange }) => {
   }
   if (q.type === 'single_choice') {
     return (
-      <RadioGroup
-        value={value || ''}
-        onValueChange={onChange}
-        className="grid gap-2 sm:grid-cols-1"
+      <div
+        className="grid gap-2"
+        role="radiogroup"
         data-testid="wizard-single-choice"
       >
-        {(q.options || []).map((opt, oi) => (
-          <label
-            key={opt}
-            onClick={() => onChange(opt)}
-            data-testid={`wizard-single-choice-option-${oi}`}
-            className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
-              value === opt
-                ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/30'
-                : 'border-border/70 bg-background/40 hover:border-border'
-            }`}
-          >
-            <RadioGroupItem value={opt} id={opt} />
-            <span>{opt}</span>
-          </label>
-        ))}
-      </RadioGroup>
+        {(q.options || []).map((opt, oi) => {
+          const selected = value === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(opt)}
+              data-testid={`wizard-single-choice-option-${oi}`}
+              className={`flex w-full cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
+                selected
+                  ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/30'
+                  : 'border-border/70 bg-background/40 hover:border-border'
+              }`}
+            >
+              <span
+                className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border transition-colors ${
+                  selected ? 'border-primary' : 'border-border'
+                }`}
+              >
+                {selected && <span className="h-2.5 w-2.5 rounded-full bg-primary" />}
+              </span>
+              <span>{opt}</span>
+            </button>
+          );
+        })}
+      </div>
     );
   }
   if (q.type === 'multi_choice') {
@@ -405,21 +416,29 @@ const QuestionInput = ({ q, value, onChange }) => {
         {(q.options || []).map((opt, oi) => {
           const checked = set.has(opt);
           return (
-            <label
+            <button
               key={opt}
-              onClick={(e) => {
-                if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
-                  toggle(opt);
-                }
-              }}
+              type="button"
+              onClick={() => toggle(opt)}
               data-testid={`wizard-multi-choice-option-${oi}`}
-              className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
+              aria-pressed={checked}
+              className={`flex w-full cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
                 checked ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/30' : 'border-border/70 bg-background/40 hover:border-border'
               }`}
             >
-              <Checkbox checked={checked} onCheckedChange={() => toggle(opt)} />
+              <span
+                className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-colors ${
+                  checked ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background/60'
+                }`}
+              >
+                {checked && (
+                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </span>
               <span>{opt}</span>
-            </label>
+            </button>
           );
         })}
       </div>
