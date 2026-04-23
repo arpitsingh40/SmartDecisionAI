@@ -106,27 +106,30 @@ export async function analyzeDecision(decision, answers, factors, onProgress) {
 
 // ================= Saved decisions =================
 export async function saveDecision({ guest_id, title, decision, answers, result }) {
-  // If user is authed, backend uses user_id and ignores guest_id
+  // Always send guest_id as a fallback; backend prefers user_id when a valid token is present.
   const body = { title, decision, answers, result };
-  if (!getAuthToken() && guest_id) body.guest_id = guest_id;
+  if (guest_id) body.guest_id = guest_id;
   const { data } = await api.post('/decisions', body);
   return data;
 }
 
 export async function listDecisions(guestId) {
-  const params = getAuthToken() ? undefined : { guest_id: guestId };
+  const params = {};
+  if (guestId) params.guest_id = guestId;
   const { data } = await api.get('/decisions', { params });
   return data;
 }
 
 export async function getDecision(id, guestId) {
-  const params = getAuthToken() ? undefined : { guest_id: guestId };
+  const params = {};
+  if (guestId) params.guest_id = guestId;
   const { data } = await api.get(`/decisions/${id}`, { params });
   return data;
 }
 
 export async function deleteDecision(id, guestId) {
-  const params = getAuthToken() ? undefined : { guest_id: guestId };
+  const params = {};
+  if (guestId) params.guest_id = guestId;
   const { data } = await api.delete(`/decisions/${id}`, { params });
   return data;
 }
