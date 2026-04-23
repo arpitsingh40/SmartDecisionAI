@@ -28,9 +28,33 @@ export async function fetchFollowUps(decision) {
   return data;
 }
 
-export async function analyzeDecision(decision, answers) {
-  const { data } = await api.post('/decisions/analyze', { decision, answers });
-  return data;
+export async function analyzeDecision(decision, answers, onProgress) {
+  // Start async job
+  const { data: start } = await api.post('/decisions/analyze/start', { decision, answers });
+  const jobId = start.job_id;
+  const deadline = Date.now() + 150000; // 150s hard cap
+  let delay = 1200;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, delay));
+    try {
+      const { data } = await api.get(`/decisions/analyze/status/${jobId}`);
+      if (onProgress) onProgress(data);
+      if (data.status === 'completed') return data.result;
+      if (data.status === 'failed') {
+        const err = new Error(data.error || 'Analysis failed');
+        err.response = { data: { detail: data.error } };
+        throw err;
+      }
+    } catch (e) {
+      if (e?.response?.status === 404) {
+        throw new Error('Job not found');
+      }
+      // transient network error — keep polling
+      if (e.message && e.message.includes('Analysis failed')) throw e;
+    }
+    delay = Math.min(delay + 300, 2500);
+  }
+  throw new Error('Analysis timed out (please try again)');
 }
 
 export async function saveDecision({ guest_id, title, decision, answers, result }) {

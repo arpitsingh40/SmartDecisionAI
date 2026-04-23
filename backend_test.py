@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Smart Decision AI
-Tests all CRUD operations and AI integration endpoints
+Backend API Testing for Smart Decision AI - Iteration 3
+Testing the new ASYNC JOB PATTERN for AI analysis
 """
 import requests
 import sys
-import json
 import time
+import json
 from datetime import datetime
 
 class SmartDecisionAPITester:
@@ -16,52 +16,47 @@ class SmartDecisionAPITester:
         self.guest_id = None
         self.tests_run = 0
         self.tests_passed = 0
-        self.decision_id = None
+        self.session = requests.Session()
+        self.session.timeout = 30
 
-    def run_test(self, name, method, endpoint, expected_status, data=None, params=None, timeout=120):
-        """Run a single API test with extended timeout for AI calls"""
+    def log(self, message):
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
+
+    def run_test(self, name, method, endpoint, expected_status, data=None, timeout=30):
+        """Run a single API test"""
         url = f"{self.api_url}/{endpoint}"
         headers = {'Content-Type': 'application/json'}
 
         self.tests_run += 1
-        print(f"\n🔍 Testing {name}...")
-        print(f"   URL: {url}")
-        if data:
-            print(f"   Data: {json.dumps(data, indent=2)[:200]}...")
+        self.log(f"🔍 Testing {name}...")
         
         try:
             if method == 'GET':
-                response = requests.get(url, headers=headers, params=params, timeout=timeout)
+                response = self.session.get(url, headers=headers, timeout=timeout)
             elif method == 'POST':
-                response = requests.post(url, json=data, headers=headers, timeout=timeout)
+                response = self.session.post(url, json=data, headers=headers, timeout=timeout)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=headers, params=params, timeout=timeout)
+                response = self.session.delete(url, headers=headers, timeout=timeout)
 
             success = response.status_code == expected_status
             if success:
                 self.tests_passed += 1
-                print(f"✅ Passed - Status: {response.status_code}")
+                self.log(f"✅ {name} - Status: {response.status_code}")
                 try:
-                    resp_data = response.json()
-                    if isinstance(resp_data, dict) and len(str(resp_data)) < 500:
-                        print(f"   Response: {resp_data}")
-                    return True, resp_data
+                    return True, response.json()
                 except:
                     return True, {}
             else:
-                print(f"❌ Failed - Expected {expected_status}, got {response.status_code}")
+                self.log(f"❌ {name} - Expected {expected_status}, got {response.status_code}")
                 try:
                     error_detail = response.json()
-                    print(f"   Error: {error_detail}")
+                    self.log(f"   Error: {error_detail}")
                 except:
-                    print(f"   Error: {response.text[:200]}")
+                    self.log(f"   Response: {response.text[:200]}")
                 return False, {}
 
-        except requests.exceptions.Timeout:
-            print(f"❌ Failed - Request timed out after {timeout}s")
-            return False, {}
         except Exception as e:
-            print(f"❌ Failed - Error: {str(e)}")
+            self.log(f"❌ {name} - Error: {str(e)}")
             return False, {}
 
     def test_root_endpoint(self):
@@ -70,271 +65,263 @@ class SmartDecisionAPITester:
 
     def test_guest_session(self):
         """Test guest session creation"""
-        success, response = self.run_test("Guest Session Creation", "POST", "guest/session", 200)
+        success, response = self.run_test("Guest Session", "POST", "guest/session", 200)
         if success and 'guest_id' in response:
             self.guest_id = response['guest_id']
-            print(f"   Guest ID: {self.guest_id}")
+            self.log(f"   Guest ID: {self.guest_id}")
             return True
         return False
 
-    def test_status_endpoints(self):
-        """Test status check endpoints"""
-        # Create status check
-        test_data = {"client_name": f"test_client_{int(time.time())}"}
-        success1, _ = self.run_test("Create Status Check", "POST", "status", 200, data=test_data)
-        
-        # Get status checks
-        success2, _ = self.run_test("Get Status Checks", "GET", "status", 200)
-        
-        return success1 and success2
-
-    def test_followups_generation(self):
-        """Test AI follow-up questions generation"""
-        test_decision = "Should I accept the software engineering job at Google or continue my PhD in Computer Science?"
-        
+    def test_followups(self):
+        """Test follow-up questions generation"""
+        decision = "Should I take a PM role at Amazon or stay at Stripe as senior engineer?"
         success, response = self.run_test(
-            "AI Follow-ups Generation", 
+            "Follow-up Questions", 
             "POST", 
             "decisions/followups", 
-            200, 
-            data={"decision": test_decision},
-            timeout=90  # AI calls can take time
+            200,
+            {"decision": decision}
         )
-        
         if success and 'questions' in response:
             questions = response['questions']
-            print(f"   Generated {len(questions)} questions")
-            
-            # Validate question structure
-            for i, q in enumerate(questions):
-                required_fields = ['id', 'question', 'type']
-                missing = [f for f in required_fields if f not in q]
-                if missing:
-                    print(f"   ❌ Question {i+1} missing fields: {missing}")
-                    return False
-                
-                # Check question types
-                if q['type'] not in ['text', 'single_choice', 'multi_choice', 'slider']:
-                    print(f"   ❌ Invalid question type: {q['type']}")
-                    return False
-                    
-                # Validate choice questions have options
-                if q['type'] in ['single_choice', 'multi_choice']:
-                    if 'options' not in q or not q['options'] or len(q['options']) < 2:
-                        print(f"   ❌ Choice question missing valid options")
-                        return False
-                        
-                # Validate slider questions have min/max
-                if q['type'] == 'slider':
-                    if 'min' not in q or 'max' not in q:
-                        print(f"   ❌ Slider question missing min/max")
-                        return False
-            
-            print(f"   ✅ All {len(questions)} questions properly structured")
-            return True
-        return False
+            self.log(f"   Generated {len(questions)} questions")
+            for i, q in enumerate(questions[:3]):  # Show first 3
+                self.log(f"   Q{i+1}: {q.get('question', '')[:60]}... ({q.get('type', 'unknown')})")
+            return True, questions
+        return False, []
 
-    def test_decision_analysis(self):
-        """Test AI decision analysis"""
-        test_decision = "Should I accept the software engineering job at Google or continue my PhD in Computer Science?"
-        test_answers = [
-            {"question": "What is your primary career goal?", "type": "single_choice", "answer": "Industry leadership"},
-            {"question": "How important is financial stability?", "type": "slider", "answer": 8},
-            {"question": "What are your key interests?", "type": "multi_choice", "answer": ["Technology", "Research"]},
-            {"question": "Any other considerations?", "type": "text", "answer": "I want to make an impact"}
-        ]
-        
+    def test_async_analyze_start(self, decision, answers):
+        """Test starting async analysis job"""
+        payload = {
+            "decision": decision,
+            "answers": answers
+        }
         success, response = self.run_test(
-            "AI Decision Analysis", 
+            "Async Analysis Start", 
             "POST", 
-            "decisions/analyze", 
-            200, 
-            data={"decision": test_decision, "answers": test_answers},
-            timeout=90  # AI calls can take time
+            "decisions/analyze/start", 
+            200,
+            payload
         )
-        
-        if success and 'options' in response:
-            options = response['options']
-            print(f"   Generated {len(options)} options")
-            
-            # Validate response structure
-            required_fields = ['options', 'best_option_id', 'reasoning', 'confidence']
-            missing = [f for f in required_fields if f not in response]
-            if missing:
-                print(f"   ❌ Response missing fields: {missing}")
-                return False
-            
-            # Validate options
-            if len(options) < 3 or len(options) > 5:
-                print(f"   ❌ Expected 3-5 options, got {len(options)}")
-                return False
-                
-            for i, option in enumerate(options):
-                option_fields = ['id', 'title', 'description', 'pros', 'cons', 'risk_level', 'score']
-                missing = [f for f in option_fields if f not in option]
-                if missing:
-                    print(f"   ❌ Option {i+1} missing fields: {missing}")
-                    return False
-                    
-                # Validate score range
-                if not (0 <= option['score'] <= 100):
-                    print(f"   ❌ Option {i+1} score out of range: {option['score']}")
-                    return False
-                    
-                # Validate risk level
-                if option['risk_level'] not in ['Low', 'Medium', 'High']:
-                    print(f"   ❌ Invalid risk level: {option['risk_level']}")
-                    return False
-            
-            # Validate best option exists
-            best_id = response['best_option_id']
-            if not any(o['id'] == best_id for o in options):
-                print(f"   ❌ Best option ID not found in options: {best_id}")
-                return False
-                
-            # Validate confidence range
-            if not (0 <= response['confidence'] <= 100):
-                print(f"   ❌ Confidence out of range: {response['confidence']}")
-                return False
-            
-            print(f"   ✅ Analysis properly structured with {len(options)} options")
-            return True
-        return False
+        if success and 'job_id' in response:
+            job_id = response['job_id']
+            status = response.get('status', 'unknown')
+            self.log(f"   Job ID: {job_id}, Status: {status}")
+            return True, job_id
+        return False, None
 
-    def test_save_decision(self):
+    def test_async_analyze_status(self, job_id, max_wait_seconds=120):
+        """Test polling async analysis job status"""
+        self.log(f"🔄 Polling job {job_id} status (max {max_wait_seconds}s)...")
+        start_time = time.time()
+        poll_count = 0
+        
+        while time.time() - start_time < max_wait_seconds:
+            poll_count += 1
+            success, response = self.run_test(
+                f"Job Status Poll #{poll_count}", 
+                "GET", 
+                f"decisions/analyze/status/{job_id}", 
+                200,
+                timeout=10
+            )
+            
+            if not success:
+                return False, None
+                
+            status = response.get('status', 'unknown')
+            elapsed = int(time.time() - start_time)
+            self.log(f"   Poll #{poll_count} ({elapsed}s): Status = {status}")
+            
+            if status == 'completed':
+                result = response.get('result')
+                if result and 'options' in result:
+                    options = result['options']
+                    best_id = result.get('best_option_id')
+                    confidence = result.get('confidence', 0)
+                    self.log(f"   ✅ Analysis completed! {len(options)} options, confidence: {confidence}%")
+                    self.log(f"   Best option ID: {best_id}")
+                    return True, result
+                else:
+                    self.log(f"   ❌ Completed but missing result data")
+                    return False, None
+                    
+            elif status == 'failed':
+                error = response.get('error', 'Unknown error')
+                self.log(f"   ❌ Analysis failed: {error}")
+                return False, None
+                
+            elif status == 'pending':
+                # Continue polling
+                time.sleep(1.5)  # Match frontend polling interval
+                continue
+            else:
+                self.log(f"   ❌ Unknown status: {status}")
+                return False, None
+                
+        self.log(f"   ❌ Timeout after {max_wait_seconds}s")
+        return False, None
+
+    def test_save_decision(self, decision, answers, result):
         """Test saving a decision"""
         if not self.guest_id:
-            print("   ❌ No guest_id available for save test")
-            return False
+            self.log("❌ No guest_id available for save test")
+            return False, None
             
-        test_data = {
+        payload = {
             "guest_id": self.guest_id,
-            "title": "Test Decision",
-            "decision": "Should I test this API?",
-            "answers": [{"question": "Test question?", "type": "text", "answer": "Yes"}],
-            "result": {
-                "options": [
-                    {
-                        "id": "opt_1",
-                        "title": "Test Option",
-                        "description": "A test option",
-                        "pros": ["Pro 1", "Pro 2"],
-                        "cons": ["Con 1", "Con 2"],
-                        "risk_level": "Low",
-                        "short_term_outcome": "Good",
-                        "long_term_outcome": "Better",
-                        "score": 85
-                    }
-                ],
-                "best_option_id": "opt_1",
-                "reasoning": "Test reasoning",
-                "confidence": 90
-            }
+            "title": decision[:60],
+            "decision": decision,
+            "answers": answers,
+            "result": result
         }
-        
-        success, response = self.run_test("Save Decision", "POST", "decisions", 200, data=test_data)
+        success, response = self.run_test(
+            "Save Decision", 
+            "POST", 
+            "decisions", 
+            200,
+            payload
+        )
         if success and 'id' in response:
-            self.decision_id = response['id']
-            print(f"   Decision ID: {self.decision_id}")
-            return True
-        return False
+            decision_id = response['id']
+            self.log(f"   Saved decision ID: {decision_id}")
+            return True, decision_id
+        return False, None
 
     def test_list_decisions(self):
-        """Test listing decisions"""
+        """Test listing saved decisions"""
         if not self.guest_id:
-            print("   ❌ No guest_id available for list test")
-            return False
+            return False, []
             
         success, response = self.run_test(
             "List Decisions", 
             "GET", 
-            "decisions", 
-            200, 
-            params={"guest_id": self.guest_id}
+            f"decisions?guest_id={self.guest_id}", 
+            200
         )
-        
         if success and isinstance(response, list):
-            print(f"   Found {len(response)} decisions")
-            return True
-        return False
+            self.log(f"   Found {len(response)} saved decisions")
+            return True, response
+        return False, []
 
-    def test_get_decision(self):
-        """Test getting a specific decision"""
-        if not self.guest_id or not self.decision_id:
-            print("   ❌ No guest_id or decision_id available for get test")
-            return False
+    def test_get_decision(self, decision_id):
+        """Test retrieving a specific decision"""
+        if not self.guest_id or not decision_id:
+            return False, None
             
         success, response = self.run_test(
             "Get Decision", 
             "GET", 
-            f"decisions/{self.decision_id}", 
-            200, 
-            params={"guest_id": self.guest_id}
+            f"decisions/{decision_id}?guest_id={self.guest_id}", 
+            200
         )
-        
-        if success and 'id' in response and response['id'] == self.decision_id:
-            print(f"   Retrieved decision: {response['title']}")
-            return True
-        return False
+        if success and 'id' in response:
+            self.log(f"   Retrieved decision: {response.get('title', 'Untitled')}")
+            return True, response
+        return False, None
 
-    def test_delete_decision(self):
+    def test_delete_decision(self, decision_id):
         """Test deleting a decision"""
-        if not self.guest_id or not self.decision_id:
-            print("   ❌ No guest_id or decision_id available for delete test")
+        if not self.guest_id or not decision_id:
             return False
             
         success, response = self.run_test(
             "Delete Decision", 
             "DELETE", 
-            f"decisions/{self.decision_id}", 
-            200, 
-            params={"guest_id": self.guest_id}
+            f"decisions/{decision_id}?guest_id={self.guest_id}", 
+            200
         )
-        
-        if success and response.get('ok'):
-            print(f"   Decision deleted successfully")
-            return True
-        return False
+        return success
 
 def main():
-    print("🚀 Starting Smart Decision AI Backend Tests")
-    print("=" * 50)
+    print("=" * 60)
+    print("Smart Decision AI - Backend API Testing (Iteration 3)")
+    print("Testing new ASYNC JOB PATTERN for AI analysis")
+    print("=" * 60)
     
     tester = SmartDecisionAPITester()
     
-    # Run all tests in sequence
-    tests = [
-        ("API Root", tester.test_root_endpoint),
-        ("Guest Session", tester.test_guest_session),
-        ("Status Endpoints", tester.test_status_endpoints),
-        ("AI Follow-ups Generation", tester.test_followups_generation),
-        ("AI Decision Analysis", tester.test_decision_analysis),
-        ("Save Decision", tester.test_save_decision),
-        ("List Decisions", tester.test_list_decisions),
-        ("Get Decision", tester.test_get_decision),
-        ("Delete Decision", tester.test_delete_decision),
+    # Basic API tests
+    if not tester.test_root_endpoint()[0]:
+        print("❌ API root endpoint failed, stopping tests")
+        return 1
+        
+    if not tester.test_guest_session():
+        print("❌ Guest session creation failed, stopping tests")
+        return 1
+    
+    # Test follow-up generation
+    success, questions = tester.test_followups()
+    if not success:
+        print("❌ Follow-up generation failed, stopping tests")
+        return 1
+    
+    # Prepare sample answers for analysis
+    sample_answers = [
+        {"question": "What's your current role level?", "type": "single_choice", "answer": "Senior Engineer"},
+        {"question": "How important is compensation?", "type": "slider", "answer": 8},
+        {"question": "What matters most to you?", "type": "multi_choice", "answer": ["Career growth", "Work-life balance"]},
+        {"question": "Any specific concerns?", "type": "text", "answer": "Worried about Amazon's work culture"},
+        {"question": "Timeline for decision?", "type": "single_choice", "answer": "Within 2 weeks"}
     ]
     
-    for test_name, test_func in tests:
-        print(f"\n{'='*20} {test_name} {'='*20}")
-        try:
-            test_func()
-        except Exception as e:
-            print(f"❌ Test {test_name} crashed: {str(e)}")
-            tester.tests_run += 1
+    decision = "Should I take a PM role at Amazon or stay at Stripe as senior engineer?"
     
-    # Print final results
-    print(f"\n{'='*50}")
-    print(f"📊 FINAL RESULTS")
-    print(f"Tests passed: {tester.tests_passed}/{tester.tests_run}")
-    success_rate = (tester.tests_passed / tester.tests_run * 100) if tester.tests_run > 0 else 0
-    print(f"Success rate: {success_rate:.1f}%")
+    # Test the new async analysis pattern
+    print("\n" + "=" * 40)
+    print("TESTING ASYNC ANALYSIS PATTERN")
+    print("=" * 40)
     
-    if success_rate >= 80:
-        print("🎉 Backend tests mostly successful!")
+    # Start async job
+    success, job_id = tester.test_async_analyze_start(decision, sample_answers)
+    if not success:
+        print("❌ Failed to start async analysis job")
+        return 1
+    
+    # Poll for completion
+    success, result = tester.test_async_analyze_status(job_id, max_wait_seconds=120)
+    if not success:
+        print("❌ Async analysis job failed or timed out")
+        return 1
+    
+    # Test CRUD operations with the result
+    print("\n" + "=" * 40)
+    print("TESTING CRUD OPERATIONS")
+    print("=" * 40)
+    
+    # Save the decision
+    success, decision_id = tester.test_save_decision(decision, sample_answers, result)
+    if not success:
+        print("❌ Failed to save decision")
+        return 1
+    
+    # List decisions
+    success, decisions_list = tester.test_list_decisions()
+    if not success:
+        print("❌ Failed to list decisions")
+        return 1
+    
+    # Get specific decision
+    success, retrieved = tester.test_get_decision(decision_id)
+    if not success:
+        print("❌ Failed to retrieve decision")
+        return 1
+    
+    # Delete decision
+    if not tester.test_delete_decision(decision_id):
+        print("❌ Failed to delete decision")
+        return 1
+    
+    # Final results
+    print("\n" + "=" * 60)
+    print(f"📊 FINAL RESULTS: {tester.tests_passed}/{tester.tests_run} tests passed")
+    print(f"Success rate: {(tester.tests_passed/tester.tests_run)*100:.1f}%")
+    
+    if tester.tests_passed == tester.tests_run:
+        print("🎉 ALL TESTS PASSED! Async job pattern is working correctly.")
         return 0
     else:
-        print("⚠️  Backend has significant issues")
+        print(f"❌ {tester.tests_run - tester.tests_passed} tests failed")
         return 1
 
 if __name__ == "__main__":

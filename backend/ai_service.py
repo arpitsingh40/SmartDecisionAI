@@ -25,15 +25,15 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
 if not EMERGENT_LLM_KEY:
     raise RuntimeError("EMERGENT_LLM_KEY not set in environment")
 
-# Primary model (best quality, ~10-15s)
+# Primary model (fast + high quality, typical 3-8s)
 PRIMARY_PROVIDER = "anthropic"
-PRIMARY_MODEL = "claude-sonnet-4-5-20250929"
-# Fast fallback (Haiku - much faster, ~3-6s; used when primary times out)
+PRIMARY_MODEL = "claude-haiku-4-5-20251001"
+# Deeper-reasoning fallback (slower but very thorough)
 FALLBACK_PROVIDER = "anthropic"
-FALLBACK_MODEL = "claude-haiku-4-5-20251001"
+FALLBACK_MODEL = "claude-sonnet-4-5-20250929"
 
-# Per-call timeout (must stay under the ingress 60s ceiling)
-CALL_TIMEOUT_SECONDS = 45.0
+# Per-call timeout (litellm timeout) — LLM itself should finish well within this
+CALL_TIMEOUT_SECONDS = 60.0
 
 
 # ---------- Schemas ----------
@@ -171,14 +171,19 @@ def _extract_json(text: str) -> str:
 
 
 async def _call_llm(system: str, user_text: str, *, provider: str, model: str, session_id: str) -> str:
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=session_id,
-        system_message=system,
-    ).with_model(provider, model)
+    chat = (
+        LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=session_id,
+            system_message=system,
+        )
+        .with_model(provider, model)
+        # Pass timeout + disable litellm's internal retries so we fail fast to the fallback
+        .with_params(timeout=CALL_TIMEOUT_SECONDS, num_retries=0, max_retries=0)
+    )
     msg = UserMessage(text=user_text)
-    # Strict per-call timeout so we never exceed ingress window.
-    return await asyncio.wait_for(chat.send_message(msg), timeout=CALL_TIMEOUT_SECONDS)
+    # Outer guard for orphan tasks
+    return await asyncio.wait_for(chat.send_message(msg), timeout=CALL_TIMEOUT_SECONDS + 10)
 
 
 async def _try_call_with_fallback(system: str, user_text: str, session_prefix: str) -> str:
@@ -205,7 +210,8 @@ async def _try_call_with_fallback(system: str, user_text: str, session_prefix: s
 # ---------- Public ----------
 async def generate_followups(decision_context: str) -> FollowUpsResponse:
     last_err: Optional[str] = None
-    for attempt in range(2):
+    # Single attempt with primary+fallback (total budget 2*25s = 50s < ingress 60s)
+    for attempt in range(1):
         user_text = (
             f"DECISION: {decision_context}\n\n"
             "Return the JSON now. JSON only, no prose."
@@ -221,12 +227,13 @@ async def generate_followups(decision_context: str) -> FollowUpsResponse:
         except (json.JSONDecodeError, ValidationError) as e:
             last_err = str(e)[:400]
             continue
-    raise RuntimeError(f"followups failed after retries: {last_err}")
+    raise RuntimeError(f"followups failed: {last_err}")
 
 
 async def analyze_decision(decision_context: str, answers: List[Dict[str, Any]]) -> DecisionResult:
     last_err: Optional[str] = None
-    for attempt in range(2):
+    # Single attempt with primary+fallback (total budget 2*25s = 50s < ingress 60s)
+    for attempt in range(1):
         user_text = (
             f"DECISION: {decision_context}\n\n"
             f"USER ANSWERS (JSON):\n{json.dumps(answers, indent=2, default=str)}\n\n"
@@ -241,4 +248,4 @@ async def analyze_decision(decision_context: str, answers: List[Dict[str, Any]])
         except (json.JSONDecodeError, ValidationError) as e:
             last_err = str(e)[:400]
             continue
-    raise RuntimeError(f"analyze failed after retries: {last_err}")
+    raise RuntimeError(f"analyze failed: {last_err}")

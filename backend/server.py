@@ -1,14 +1,15 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Query, BackgroundTasks
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+import asyncio
 import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Any, Dict, List, Optional
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from ai_service import (
     generate_followups,
@@ -129,14 +130,80 @@ async def api_followups(payload: DecisionContextRequest):
         logger.exception("followups error")
         raise HTTPException(status_code=502, detail=f"AI service error: {str(e)[:200]}")
 
-@api_router.post("/decisions/analyze", response_model=DecisionResult)
+
+# ----- Async Analyze Jobs (avoids ingress 60s timeout on long LLM calls) -----
+# In-memory job store. For a single-worker deployment this is fine; for multi-worker, use Redis/DB.
+_analyze_jobs: Dict[str, Dict[str, Any]] = {}
+_JOB_TTL_SECONDS = 900  # 15 min
+
+
+def _prune_old_jobs() -> None:
+    now = datetime.now(timezone.utc)
+    stale = [
+        jid
+        for jid, j in _analyze_jobs.items()
+        if (now - j.get("created_at", now)).total_seconds() > _JOB_TTL_SECONDS
+    ]
+    for jid in stale:
+        _analyze_jobs.pop(jid, None)
+
+
+async def _run_analyze_job(job_id: str, decision: str, answers: List[Dict[str, Any]]):
+    try:
+        result = await analyze_decision(decision, answers)
+        job = _analyze_jobs.get(job_id)
+        if job is None:
+            return
+        job["status"] = "completed"
+        job["result"] = result.model_dump()
+        job["completed_at"] = datetime.now(timezone.utc)
+    except Exception as e:
+        logger.exception("analyze job %s failed", job_id)
+        job = _analyze_jobs.get(job_id)
+        if job is None:
+            return
+        job["status"] = "failed"
+        job["error"] = str(e)[:400]
+        job["completed_at"] = datetime.now(timezone.utc)
+
+
+@api_router.post("/decisions/analyze")
 async def api_analyze(payload: AnalyzePayload):
+    """Synchronous analyze endpoint (short decisions only). For long calls prefer /start+/status."""
     try:
         result = await analyze_decision(payload.decision, payload.answers)
         return result
     except Exception as e:
         logger.exception("analyze error")
         raise HTTPException(status_code=502, detail=f"AI service error: {str(e)[:200]}")
+
+
+@api_router.post("/decisions/analyze/start")
+async def api_analyze_start(payload: AnalyzePayload, background_tasks: BackgroundTasks):
+    """Start an async analyze job. Returns immediately with job_id. Client polls /analyze/status."""
+    _prune_old_jobs()
+    job_id = str(uuid.uuid4())
+    _analyze_jobs[job_id] = {
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc),
+        "decision": payload.decision,
+    }
+    # Run as a real asyncio task (background_tasks runs after response — also fine)
+    asyncio.create_task(_run_analyze_job(job_id, payload.decision, payload.answers))
+    return {"job_id": job_id, "status": "pending"}
+
+
+@api_router.get("/decisions/analyze/status/{job_id}")
+async def api_analyze_status(job_id: str):
+    job = _analyze_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    resp: Dict[str, Any] = {"status": job["status"]}
+    if job["status"] == "completed":
+        resp["result"] = job.get("result")
+    elif job["status"] == "failed":
+        resp["error"] = job.get("error", "Unknown error")
+    return resp
 
 
 # ---- Saved decisions CRUD ----
