@@ -6,6 +6,7 @@ Falls back to OpenAI gpt-4.1 if primary fails.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
@@ -24,10 +25,15 @@ EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
 if not EMERGENT_LLM_KEY:
     raise RuntimeError("EMERGENT_LLM_KEY not set in environment")
 
+# Primary model (best quality, ~10-15s)
 PRIMARY_PROVIDER = "anthropic"
 PRIMARY_MODEL = "claude-sonnet-4-5-20250929"
-FALLBACK_PROVIDER = "openai"
-FALLBACK_MODEL = "gpt-4.1"
+# Fast fallback (Haiku - much faster, ~3-6s; used when primary times out)
+FALLBACK_PROVIDER = "anthropic"
+FALLBACK_MODEL = "claude-haiku-4-5-20251001"
+
+# Per-call timeout (must stay under the ingress 60s ceiling)
+CALL_TIMEOUT_SECONDS = 45.0
 
 
 # ---------- Schemas ----------
@@ -171,7 +177,8 @@ async def _call_llm(system: str, user_text: str, *, provider: str, model: str, s
         system_message=system,
     ).with_model(provider, model)
     msg = UserMessage(text=user_text)
-    return await chat.send_message(msg)
+    # Strict per-call timeout so we never exceed ingress window.
+    return await asyncio.wait_for(chat.send_message(msg), timeout=CALL_TIMEOUT_SECONDS)
 
 
 async def _try_call_with_fallback(system: str, user_text: str, session_prefix: str) -> str:
@@ -186,6 +193,9 @@ async def _try_call_with_fallback(system: str, user_text: str, session_prefix: s
                 model=model,
                 session_id=f"{session_prefix}-{uuid.uuid4()}",
             )
+        except asyncio.TimeoutError as e:
+            last_err = e
+            continue
         except Exception as e:
             last_err = e
             continue
@@ -195,7 +205,7 @@ async def _try_call_with_fallback(system: str, user_text: str, session_prefix: s
 # ---------- Public ----------
 async def generate_followups(decision_context: str) -> FollowUpsResponse:
     last_err: Optional[str] = None
-    for attempt in range(3):
+    for attempt in range(2):
         user_text = (
             f"DECISION: {decision_context}\n\n"
             "Return the JSON now. JSON only, no prose."
@@ -216,7 +226,7 @@ async def generate_followups(decision_context: str) -> FollowUpsResponse:
 
 async def analyze_decision(decision_context: str, answers: List[Dict[str, Any]]) -> DecisionResult:
     last_err: Optional[str] = None
-    for attempt in range(3):
+    for attempt in range(2):
         user_text = (
             f"DECISION: {decision_context}\n\n"
             f"USER ANSWERS (JSON):\n{json.dumps(answers, indent=2, default=str)}\n\n"

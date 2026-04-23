@@ -102,7 +102,7 @@ const Wizard = () => {
 
   const setAnswer = (qid, v) => setAnswers((a) => ({ ...a, [qid]: v }));
 
-  const runAnalysis = async () => {
+  const runAnalysis = async (retryNum = 0) => {
     setPhase('analyzing');
     try {
       const normAnswers = questions.map((q) => ({
@@ -136,6 +136,12 @@ const Wizard = () => {
       }
     } catch (e) {
       const msg = e?.response?.data?.detail || e.message || 'Analysis failed';
+      // one silent retry on transient network errors
+      if (retryNum === 0 && (String(msg).toLowerCase().includes('502') || String(msg).toLowerCase().includes('network') || String(msg).toLowerCase().includes('ai service'))) {
+        toast.message('Retrying analysis…');
+        await new Promise((r) => setTimeout(r, 800));
+        return runAnalysis(1);
+      }
       toast.error(msg);
       setPhase('review');
     }
@@ -369,9 +375,11 @@ const QuestionInput = ({ q, value, onChange }) => {
         className="grid gap-2 sm:grid-cols-1"
         data-testid="wizard-single-choice"
       >
-        {(q.options || []).map((opt) => (
+        {(q.options || []).map((opt, oi) => (
           <label
             key={opt}
+            onClick={() => onChange(opt)}
+            data-testid={`wizard-single-choice-option-${oi}`}
             className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
               value === opt
                 ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/30'
@@ -394,11 +402,17 @@ const QuestionInput = ({ q, value, onChange }) => {
     };
     return (
       <div className="grid gap-2" data-testid="wizard-multi-choice">
-        {(q.options || []).map((opt) => {
+        {(q.options || []).map((opt, oi) => {
           const checked = set.has(opt);
           return (
             <label
               key={opt}
+              onClick={(e) => {
+                if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
+                  toggle(opt);
+                }
+              }}
+              data-testid={`wizard-multi-choice-option-${oi}`}
               className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
                 checked ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/30' : 'border-border/70 bg-background/40 hover:border-border'
               }`}
