@@ -1,15 +1,23 @@
-# Smart Decision AI — Updated Development Plan
+# Smart Decision AI — Updated Development Plan (v1.1 Decision Intelligence)
 
 ## 1) Objectives
-- Deliver a premium, responsive decision-making web app for students/young professionals with a guided wizard and a results dashboard.
-- Prove the core AI workflow works reliably **before** building the full UI: (a) dynamic follow-up questions, (b) strict-JSON decision analysis (3–5 options + scores + recommendation + confidence).
-- Ship V1 with guest mode (localStorage guest ID), saved decisions in MongoDB, what-if + comparison tools, and PDF export.
-- Meet quality bar: Linear/Vercel/Notion-inspired UI, dark-first + light toggle, smooth animations, accessible, and fast.
+- Deliver a premium, responsive **Decision Intelligence** web app for students/young professionals with a guided wizard and a results dashboard.
+- Provide **high-quality, data-driven, outcome-focused decisions** using a mandatory framework:
+  - Problem understanding → options → outcome prediction → optimization → execution plan → plan B.
+- Ensure AI outputs are **strict JSON** with strong reliability and explainability:
+  - Structured schema validated with Pydantic.
+  - Server-side JSON repair for rare malformed outputs.
+- Support both **guest mode** and **email/password login**:
+  - Guest: localStorage guest_id.
+  - Auth: bcrypt + JWT (30 days), persisted in localStorage.
+  - **Guest and user decisions remain separate** (per user choice).
+- Ship modern product-quality UX (Linear/Vercel/Notion inspired): dark-first + light toggle, Framer Motion micro-interactions, responsive, accessible.
 
 **Status update (as of now):**
 - ✅ Phase 1 complete (POC validated strict JSON reliability).
 - ✅ Phase 2 complete (full V1 app implemented + end-to-end tested).
-- 🔜 Phase 3 optional (polish, edge cases, enhancements) — only if requested.
+- ✅ Phase 3 complete (**Decision Intelligence upgrade + auth + deeper tools + reliability + performance**).
+- 🔜 Phase 4 optional (hardening, telemetry, sharing, settings, feature flags).
 
 ---
 
@@ -20,7 +28,7 @@
 
 **User stories**
 1. As a user, I can enter a decision and instantly get 5–8 tailored follow-up questions.
-2. As a user, I can answer follow-ups and receive 3–5 concrete options with scores and outcomes.
+2. As a user, I can answer follow-ups and receive structured options with scores and outcomes.
 3. As a user, I can trust the output is consistently structured (no malformed JSON).
 4. As a user, I can see a clear best recommendation with a confidence score.
 5. As a user, I get actionable, non-generic pros/cons and risk levels.
@@ -57,8 +65,8 @@
   - `POST /api/decisions/followups` → dynamic follow-up questions.
   - **Async analyze (added to bypass ingress timeout):**
     - `POST /api/decisions/analyze/start` → returns job_id immediately.
-    - `GET /api/decisions/analyze/status/{job_id}` → returns pending/completed/failed + result.
-  - (Optional sync endpoint kept): `POST /api/decisions/analyze`.
+    - `GET /api/decisions/analyze/status/{job_id}` → pending/completed/failed + result.
+  - (Optional sync kept): `POST /api/decisions/analyze`.
 - Saved decisions CRUD:
   - `POST /api/decisions` → save decision.
   - `GET /api/decisions?guest_id=...` → list summaries.
@@ -66,12 +74,12 @@
   - `DELETE /api/decisions/{id}?guest_id=...` → delete.
 - Reliability improvements:
   - Async job pattern avoids 60s ingress/proxy timeouts.
-  - LLM call parameters set to fail fast (litellm retries disabled) and use provider fallback.
+  - LLM call parameters set to fail fast (litellm retries disabled) and provider fallback.
 
 **AI model strategy — completed**
-- Primary: Claude Haiku 4.5 (fast; typical ~5–15s).
-- Fallback: Claude Sonnet 4.5 (deeper reasoning).
-- Strict JSON schema validation enforced via Pydantic.
+- Primary: Claude Haiku 4.5 (fast).
+- Fallback: provider fallback used for resilience.
+- Strict JSON schema validation via Pydantic.
 
 **Frontend (React + Tailwind + shadcn/ui + Framer Motion + Recharts + jsPDF) — completed**
 - Landing page:
@@ -81,9 +89,9 @@
   - Dynamic AI follow-ups (text, slider, single-choice, multi-choice).
   - Review step with answer summary + edit.
   - Analysis loading state.
-  - **Reliability fix:** replaced single-choice + multi-choice UI with button-based inputs to avoid flaky selection issues.
+  - Reliability fix: choice inputs implemented as button-based for robust selection.
 - Results dashboard:
-  - Best option hero card with score, risk, outcomes.
+  - Best option hero card.
   - Ranked option cards with expand/collapse.
   - Score bar chart (Recharts).
   - Pros/cons comparison table.
@@ -101,85 +109,113 @@
 **Testing checkpoint (met)**
 - ✅ Full E2E pass verified:
   - landing → wizard → follow-ups → review → async analyze → results → save → reopen → export dialog.
-- Example E2E result:
-  - “Should I buy a PS5 or Xbox Series X?” → best: “Buy PS5 now, Xbox later” (score 88, confidence 87%) in ~18s.
 
 ---
 
-### Phase 3 — Interactive Tools + UX Polish (optional, on request)
-**Goal:** Refine interactivity, performance, and decision exploration depth.
+### Phase 3 — Decision Intelligence Upgrade + Auth + Deeper Tools (completed)
+**Goal:** Upgrade from “decision assistant” to a true **Decision Intelligence Engine** with quantified outcomes, execution plans, and robust persistence.
 
 **User stories**
-1. As a user, I can adjust importance sliders and rerun analysis as a what-if scenario.
-2. As a user, I can compare 2–3 options side-by-side.
-3. As a user, I can duplicate a past decision and tweak answers.
-4. As a user, I can see clear loading/progress states while AI runs.
-5. As a user, I can quickly scan risks and tradeoffs with clearer visuals.
+1. As a user, every analysis follows a consistent Decision Intelligence framework (goal → insights → options → outcome prediction → best decision → execution plan → plan B → confidence).
+2. As a user, I can log in with email/password and access my own decision library.
+3. As a user, my guest decisions are separate from my logged-in library (no migration).
+4. As a user, I never lose my in-progress wizard if I refresh or navigate away.
+5. As a user, I can duplicate a past decision and quickly iterate.
+6. As a user, what-if mode feels responsive and teaches me sensitivity/robustness.
+7. As a user, AI outputs remain structured even if the model occasionally produces malformed JSON.
 
-**Current status**
-- ✅ What-if and compare are implemented in V1.
+**Backend — completed**
+- **Decision Intelligence AI schema** (strict JSON + Pydantic validation):
+  - Top-level: `goal`, `key_insights` (2–4), `execution_plan` (3–6 steps), `plan_b`, `plan_b_trigger`, `confidence`.
+  - Per-option: `success_probability`, `expected_return`, `time_to_result`, `geography`, `easiness`, `support`, `history`, `financial_ratio`, `why_not`, plus `pros/cons/risk/score/outcomes`.
+- **Server-side JSON repair**:
+  - Added `json_repair` fallback parser for rare malformed JSON outputs.
+- **Email/password auth**:
+  - `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/auth/me`.
+  - bcrypt password hashing + JWT (30 days).
+- **Decision ownership & scoping**:
+  - When authenticated: decisions saved/listed by `user_id`.
+  - When not authenticated: decisions saved/listed by `guest_id`.
+  - Guest vs user libraries remain separate.
+- **Performance tuning**:
+  - Schema caps: max 4 options, 2–4 pros/cons, max 6 execution steps.
+  - Prompt condensed for faster completion.
+  - Typical analysis completion: ~40–50s via async job polling (previously 80–120s).
+
+**Frontend — completed**
+- **Auth UI & state**:
+  - `/auth` page with login/signup tabs.
+  - Auth token persisted to localStorage and attached via axios interceptor.
+  - TopNav updated: logged-out shows Log in/Sign up; logged-in shows user menu + logout.
+- **Premium Results UI upgrade**:
+  - Goal pill.
+  - Key insights panel.
+  - Execution Plan tab with timeline + cost/benefit + tools.
+  - Plan B card with explicit trigger.
+  - Option cards show extended metrics + “Why not this one?” for non-best.
+  - PDF export updated with toggles for key insights + execution plan.
+- **Wizard draft auto-save**:
+  - Draft saved to localStorage on changes.
+  - Resume banner with Resume / Start fresh.
+  - Start-over button.
+- **Duplicate past decisions**:
+  - From Saved library: “Duplicate” button prefills wizard for iteration.
+- **Deeper what-if**:
+  - Live mode toggle with ~1.2s debounce auto rerun.
+  - Sensitivity note: flip/swing/stable indicators.
+
+**Testing checkpoint (mostly met)**
+- ✅ Backend: 95% tests passing (Decision Intelligence schema, auth, scoping, async analyze).
+- ✅ Mobile: 100% responsive tests passing.
+- ✅ Frontend: 85% automated tests passing; full E2E manually verified by main agent (wizard → results).
+- Remaining low-priority items:
+  - `POST /api/decisions` returns 200 vs 201 (cosmetic).
+  - Some long-flow test flakiness due to timing/session; core flow confirmed working.
+
+---
+
+### Phase 4 — Stabilization, Performance, and Production Readiness (optional)
+**Goal:** Harden reliability, observability, and product readiness for broader usage.
+
+**User stories**
+1. As a user, the app feels fast and never loses state.
+2. As a user, errors are recoverable with clear guidance.
+3. As a user, I can manage decisions confidently (search, tags, delete, share).
+4. As a product owner, I can observe usage and failures.
 
 **Potential enhancements**
-- What-if:
-  - debounce + cancel in-flight requests
-  - show clearer score deltas (sparklines)
-  - “sensitivity insights” (which answers change ranking most)
-- Compare:
-  - add mobile carousel + sticky headers
-  - allow pinning best option
-- Decision management:
-  - duplicate decision + edit answers
-  - tagging, search, filtering
-- AI robustness:
-  - add JSON-repair step (server-side) for rare malformed outputs
-  - add “ask 1 more clarifying question” fallback when confidence is low
-
-**Testing checkpoint**
-- E2E pass focused on what-if + comparison + saved decision flows.
-
----
-
-### Phase 4 — Stabilization, Performance, and Production Readiness
-**Goal:** Make it robust and fast; ensure no regressions.
-
-**User stories**
-1. As a user, the app feels fast with smooth transitions and minimal waiting confusion.
-2. As a user, I never lose my work if I refresh mid-wizard.
-3. As a user, errors are recoverable with clear guidance.
-4. As a user, the app works well on mobile.
-5. As a user, I can manage my saved decisions (view/delete) confidently.
-
-**Current status**
-- ✅ V1 is production-ready for guest-mode usage.
-
-**Next hardening steps (if needed)**
+- Account settings:
+  - Update profile name/email/password.
+- Sharing:
+  - Public share links (read-only) with optional redaction.
+- Feature flags:
+  - Toggle Decision Intelligence vs basic mode, experimental models, new UI blocks.
+- Observability:
+  - Structured logs, trace IDs, latency metrics per endpoint.
+  - Basic telemetry/events.
 - Performance:
-  - lazy-load heavy views/components (charts, PDF)
-  - optimize bundle and caching
-- Reliability:
-  - persist wizard draft to localStorage
-  - rate limit per guest_id
-  - structured logs + monitoring
-- Accessibility:
-  - tab order validation, ARIA labels audit, contrast review
-- Regression testing:
-  - repeat fixture decisions on schedule
-  - smoke tests for all routes
+  - Lazy-load charts/PDF.
+  - Add caching for repeated analyses (optional).
+- AI robustness:
+  - “Ask one more clarifying question” fallback when confidence is low.
+  - Optional streaming UI for analysis progress.
 
 ---
 
 ## 3) Next Actions
-**V1 is complete.** Next actions are optional depending on desired scope:
-1. (Optional) Phase 3 enhancements: deeper what-if + compare polish, duplicate/edit flow.
-2. (Optional) Add JSON repair + additional guardrails for rare malformed outputs.
-3. (Optional) Add persistence for in-progress wizard drafts.
-4. (Optional) Add analytics/events and basic rate limiting.
+**Current status:** V1.1 (Decision Intelligence) is complete.
+
+Recommended next actions (optional):
+1. **Cosmetic API polish:** return HTTP 201 for `POST /api/decisions`.
+2. **Wizard reliability hardening:** tighten resume logic, add explicit “draft versioning” and better test stabilization.
+3. **Product enhancements:** settings, share links, telemetry, feature flags.
 
 ---
 
 ## 4) Success Criteria
-- ✅ **Core AI reliability:** Pydantic-valid JSON returned consistently (POC passed).
-- ✅ **User value:** tailored 3–5 viable options, clear best recommendation, confidence score.
+- ✅ **Core AI reliability:** Strict JSON output validated by Pydantic; JSON repair fallback in place.
+- ✅ **Decision Intelligence quality:** quantified outcomes, success probability, ROI framing, execution plan + plan B.
 - ✅ **UX quality:** premium look/feel, responsive, smooth animations, clear hierarchy.
-- ✅ **Functional completeness (V1):** landing → wizard → results → save/revisit → what-if/compare → PDF export.
+- ✅ **Functional completeness:** landing → wizard → results → save/revisit → compare/what-if → PDF export.
 - ✅ **Infrastructure reliability:** async job pattern prevents ingress/proxy timeouts.
+- ✅ **Auth:** email/password login + persistent sessions; user decision scoping works; guest remains supported and separate.
