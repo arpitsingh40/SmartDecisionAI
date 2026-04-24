@@ -80,8 +80,8 @@ export async function analyzeDecision(decision, answers, factors, onProgress) {
     factors: (factors || []).map((f) => ({ name: f.name, weight: Number(f.weight) || 0 })),
   });
   const jobId = start.job_id;
-  const deadline = Date.now() + 180000; // 3 min hard cap
-  let delay = 1200;
+  const deadline = Date.now() + 240000; // 4 min hard cap (execution-engine output is larger)
+  let delay = 1500;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, delay));
     try {

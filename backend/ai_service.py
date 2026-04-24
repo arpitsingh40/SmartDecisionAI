@@ -116,7 +116,7 @@ class ExecutionStep(BaseModel):
 class ExecutionPlan(BaseModel):
     title: str
     total_timeline: str
-    steps: List[ExecutionStep] = Field(min_length=3, max_length=6)
+    steps: List[ExecutionStep] = Field(min_length=3, max_length=5)
     short_term_plan: Optional[str] = None
     moderate_benefits: Optional[str] = None
 
@@ -137,8 +137,8 @@ class DecisionOption(BaseModel):
     title: str
     description: str
     is_do_nothing: bool = False
-    pros: List[str] = Field(min_length=2, max_length=4)
-    cons: List[str] = Field(min_length=2, max_length=4)
+    pros: List[str] = Field(min_length=2, max_length=3)
+    cons: List[str] = Field(min_length=2, max_length=3)
     risk_level: Literal["Low", "Medium", "High"]
     short_term_outcome: str
     long_term_outcome: str
@@ -217,25 +217,25 @@ class Scorecard(BaseModel):
 
 
 class DecisionResult(BaseModel):
-    options: List[DecisionOption] = Field(min_length=3, max_length=5)
+    options: List[DecisionOption] = Field(min_length=3, max_length=4)
     best_option_id: str
     reasoning: str
     confidence: conint(ge=0, le=100)
     goal: str
-    key_insights: List[str] = Field(min_length=2, max_length=4)
-    assumptions: List[str] = Field(default_factory=list, max_length=6)
-    bias_flags: List[BiasFlag] = Field(default_factory=list, max_length=4)
+    key_insights: List[str] = Field(min_length=2, max_length=3)
+    assumptions: List[str] = Field(default_factory=list, max_length=4)
+    bias_flags: List[BiasFlag] = Field(default_factory=list, max_length=3)
     execution_plan: Optional[ExecutionPlan] = None
     plan_b: Optional[str] = None
     plan_b_trigger: Optional[str] = None
     # Echo back what AI saw (handy for UI)
     factors_used: List[str] = Field(default_factory=list)
     # --- Execution Engine (Phase 5) ---
-    key_reasons: List[str] = Field(default_factory=list, max_length=5)
+    key_reasons: List[str] = Field(default_factory=list, max_length=4)
     expected_outcome: Optional[ExpectedOutcome] = None
-    risks: List[RiskItem] = Field(default_factory=list, max_length=6)
-    automation_layer: List[AutomationIdea] = Field(default_factory=list, max_length=5)
-    kpis: List[KPI] = Field(default_factory=list, max_length=5)
+    risks: List[RiskItem] = Field(default_factory=list, max_length=4)
+    automation_layer: List[AutomationIdea] = Field(default_factory=list, max_length=3)
+    kpis: List[KPI] = Field(default_factory=list, max_length=4)
     monetization: Optional[MonetizationTriggers] = None
     scorecard: Optional[Scorecard] = None
 

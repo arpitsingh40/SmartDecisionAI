@@ -1,26 +1,34 @@
 [
   {
-    "content": "Phase 5: Backend - extended schema with Execution Engine fields",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 5: Backend - 'Decision Execution Engine' prompt + user_level",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 5: Frontend - Expected Outcome / Risk Analysis / KPIs / Automation / Monetization / Scorecard / Key Reasons components",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 5: Frontend - Enhanced ExecutionPlanCard with difficulty badges + 'Start Now' action buttons per step",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 5: Frontend - New 'Execute' tab bundling all sections; sidebar scorecard on Overview",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 5: E2E Testing via Testing Agent",
+    "content": "Phase 6: Architect multi-agent system - 6 specialized agents (Strategic, Financial, Risk, Execution, Contrarian, Optimization) running in parallel + Synthesizer",
     "status": "in_progress"
+  },
+  {
+    "content": "Phase 6: Backend - /app/backend/multi_agent_service.py with 6 focused agent prompts + synthesizer",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 6: Backend - extend DecisionResult schema with agent_perspectives + debate fields",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 6: Backend - wire _run_analyze_job to use multi-agent orchestration (asyncio.gather 6 agents + synthesizer)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 6: Frontend - AgentsPanel component (6 agent cards + Debate/Conflicts section)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 6: Frontend - new 'Panel' tab in Results showing the boardroom view",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 6: Compare old vs new system + write design doc (architecture + communication flow)",
+    "status": "pending"
+  },
+  {
+    "content": "Phase 6: E2E Testing via Testing Agent",
+    "status": "pending"
   }
 ]
