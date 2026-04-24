@@ -27,6 +27,8 @@ import AssumptionsCard from '@/components/results/AssumptionsCard';
 import EvaluationMatrix from '@/components/results/EvaluationMatrix';
 import RiskScenarios from '@/components/results/RiskScenarios';
 import FutureImpact from '@/components/results/FutureImpact';
+import ExecuteDashboard from '@/components/results/ExecuteDashboard';
+import Scorecard from '@/components/results/Scorecard';
 
 const useQuery = () => {
   const { search } = useLocation();
@@ -178,10 +180,10 @@ const Results = () => {
       <Tabs defaultValue="overview">
         <TabsList className="mb-6 flex flex-wrap">
           <TabsTrigger value="overview" data-testid="results-tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="execute" data-testid="results-tab-execute">Execute</TabsTrigger>
           <TabsTrigger value="evaluation" data-testid="results-tab-evaluation">Evaluation</TabsTrigger>
-          <TabsTrigger value="risk" data-testid="results-tab-risk">Risk</TabsTrigger>
+          <TabsTrigger value="risk" data-testid="results-tab-risk">Scenarios</TabsTrigger>
           <TabsTrigger value="future" data-testid="results-tab-future">Future</TabsTrigger>
-          <TabsTrigger value="plan" data-testid="results-tab-plan">Execution plan</TabsTrigger>
           <TabsTrigger value="compare" data-testid="results-tab-compare">Compare</TabsTrigger>
           <TabsTrigger value="whatif" data-testid="results-tab-whatif">What-if</TabsTrigger>
         </TabsList>
@@ -226,6 +228,10 @@ const Results = () => {
 
             {/* Right rail */}
             <div className="space-y-4 lg:col-span-4">
+              {result?.scorecard && (
+                <Scorecard scorecard={result.scorecard} />
+              )}
+
               <Card className="rounded-2xl border-border/70 bg-card/60 p-5" data-testid="results-confidence-meter">
                 <div className="flex items-center justify-between">
                   <div>
@@ -281,6 +287,10 @@ const Results = () => {
           </div>
         </TabsContent>
 
+        <TabsContent value="execute">
+          <ExecuteDashboard result={result} best={best} />
+        </TabsContent>
+
         <TabsContent value="evaluation">
           {factorsInput.length > 0 ? (
             <EvaluationMatrix options={ranked} factors={factorsInput} bestId={bestId} />
@@ -298,17 +308,6 @@ const Results = () => {
 
         <TabsContent value="future">
           <FutureImpact options={ranked} bestId={bestId} />
-        </TabsContent>
-
-        <TabsContent value="plan">
-          {result?.execution_plan ? (
-            <ExecutionPlanCard plan={result.execution_plan} best={best} />
-          ) : (
-            <Card className="rounded-2xl border-border/70 bg-card/60 p-8 text-center" data-testid="results-no-execution-plan">
-              <BarChart3 className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">No execution plan was returned for this analysis.</p>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="compare">

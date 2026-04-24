@@ -1,16 +1,58 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import { stagger, fadeUp } from '@/lib/motion';
-import { Flag, Clock, DollarSign, Wrench, CheckCircle2, Zap } from 'lucide-react';
+import {
+  Flag, Clock, DollarSign, Wrench, CheckCircle2, Zap, ExternalLink, Play, Sparkles,
+} from 'lucide-react';
 
 const priorityColor = (p) =>
-  p === 'High'
-    ? 'bg-rose-500/15 text-rose-500 ring-rose-500/30'
-    : p === 'Medium'
-    ? 'bg-amber-500/15 text-amber-500 ring-amber-500/30'
-    : 'bg-emerald-500/15 text-emerald-500 ring-emerald-500/30';
+  p === 'High' ? 'bg-rose-500/15 text-rose-500 ring-rose-500/30'
+  : p === 'Medium' ? 'bg-amber-500/15 text-amber-500 ring-amber-500/30'
+  : 'bg-emerald-500/15 text-emerald-500 ring-emerald-500/30';
+
+const diffColor = (d) =>
+  d === 'Hard' ? 'bg-rose-500/10 text-rose-500 ring-rose-500/30'
+  : d === 'Medium' ? 'bg-amber-500/10 text-amber-500 ring-amber-500/30'
+  : 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/30';
+
+const ActionButton = ({ button, idx }) => {
+  if (!button) return null;
+  const href = button.url || null;
+  const label = button.label || 'Start Now';
+  const tool = button.tool;
+  return (
+    <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3" data-testid={`plan-action-${idx}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 flex items-center gap-2">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium">{button.instruction || label}</div>
+            {tool && <div className="text-[11px] text-muted-foreground">Tool: {tool}</div>}
+          </div>
+        </div>
+        {href ? (
+          <a href={href} target="_blank" rel="noopener noreferrer" data-testid={`plan-action-link-${idx}`}>
+            <Button size="sm" className="gap-1.5 h-8">
+              <Play className="h-3 w-3" /> {label} <ExternalLink className="h-3 w-3" />
+            </Button>
+          </a>
+        ) : (
+          <Button size="sm" className="gap-1.5 h-8" disabled>
+            <Play className="h-3 w-3" /> {label}
+          </Button>
+        )}
+      </div>
+      {button.automation_shortcut && button.automation_shortcut.toLowerCase() !== 'none' && (
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/40 px-2 py-1 text-[11px] text-muted-foreground">
+          <Zap className="h-3 w-3" /> Shortcut: {button.automation_shortcut}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ExecutionPlanCard = ({ plan, best }) => {
   if (!plan) return null;
@@ -24,7 +66,9 @@ const ExecutionPlanCard = ({ plan, best }) => {
             </Badge>
             <h3 className="mt-3 text-lg font-semibold tracking-tight sm:text-xl">{plan.title}</h3>
             {best?.title && (
-              <p className="mt-1 text-xs text-muted-foreground">For option: <span className="font-medium">{best.title}</span></p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                For option: <span className="font-medium">{best.title}</span>
+              </p>
             )}
           </div>
           {plan.total_timeline && (
@@ -36,7 +80,6 @@ const ExecutionPlanCard = ({ plan, best }) => {
         </div>
       </Card>
 
-      {/* Steps timeline */}
       <motion.ol
         initial="initial"
         animate="animate"
@@ -48,7 +91,7 @@ const ExecutionPlanCard = ({ plan, best }) => {
             key={i}
             variants={fadeUp}
             className="relative"
-            data-testid={`results-plan-step-${i}"`}
+            data-testid={`results-plan-step-${i}`}
           >
             <span className="absolute -left-[26px] grid h-6 w-6 place-items-center rounded-full border border-primary/40 bg-primary/10 text-[11px] font-bold text-primary">
               {s.step || i + 1}
@@ -64,9 +107,19 @@ const ExecutionPlanCard = ({ plan, best }) => {
                         {s.timeline}
                       </span>
                     )}
+                    {typeof s.days === 'number' && (
+                      <span className="inline-flex items-center gap-1">
+                        ~{s.days}d
+                      </span>
+                    )}
                     {s.priority && (
                       <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ring-1 ${priorityColor(s.priority)}`}>
                         {s.priority}
+                      </span>
+                    )}
+                    {s.difficulty && (
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ring-1 ${diffColor(s.difficulty)}`}>
+                        {s.difficulty}
                       </span>
                     )}
                   </div>
@@ -96,12 +149,12 @@ const ExecutionPlanCard = ({ plan, best }) => {
                   ))}
                 </div>
               )}
+              <ActionButton button={s.action_button} idx={i} />
             </Card>
           </motion.li>
         ))}
       </motion.ol>
 
-      {/* Short-term + moderate benefits */}
       <div className="grid gap-4 sm:grid-cols-2">
         {plan.short_term_plan && (
           <Card className="rounded-2xl border-border/70 bg-card/60 p-5">
@@ -114,7 +167,7 @@ const ExecutionPlanCard = ({ plan, best }) => {
         {plan.moderate_benefits && (
           <Card className="rounded-2xl border-border/70 bg-card/60 p-5">
             <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-500">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Moderate‑effort benefits
+              <CheckCircle2 className="h-3.5 w-3.5" /> Moderate-effort benefits
             </div>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{plan.moderate_benefits}</p>
           </Card>

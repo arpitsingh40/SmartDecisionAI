@@ -233,9 +233,9 @@ def _prune_old_jobs() -> None:
         _analyze_jobs.pop(jid, None)
 
 
-async def _run_analyze_job(job_id: str, decision: str, answers: List[Dict[str, Any]], factors: List[Dict[str, Any]]):
+async def _run_analyze_job(job_id: str, decision: str, answers: List[Dict[str, Any]], factors: List[Dict[str, Any]], user_level: str = "intermediate"):
     try:
-        result = await analyze_decision(decision, answers, factors=factors)
+        result = await analyze_decision(decision, answers, factors=factors, user_level=user_level)
         job = _analyze_jobs.get(job_id)
         if job is None:
             return
@@ -257,7 +257,7 @@ async def api_analyze(payload: AnalyzePayload):
     """Synchronous analyze — small/quick decisions."""
     try:
         factors = [f.model_dump() for f in (payload.factors or [])]
-        result = await analyze_decision(payload.decision, payload.answers, factors=factors)
+        result = await analyze_decision(payload.decision, payload.answers, factors=factors, user_level=payload.user_level)
         return result
     except Exception as e:
         logger.exception("analyze error")
@@ -274,7 +274,7 @@ async def api_analyze_start(payload: AnalyzePayload, background_tasks: Backgroun
         "decision": payload.decision,
     }
     factors = [f.model_dump() for f in (payload.factors or [])]
-    asyncio.create_task(_run_analyze_job(job_id, payload.decision, payload.answers, factors))
+    asyncio.create_task(_run_analyze_job(job_id, payload.decision, payload.answers, factors, payload.user_level))
     return {"job_id": job_id, "status": "pending"}
 
 

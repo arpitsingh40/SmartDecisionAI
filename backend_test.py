@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-Smart Decision AI Phase 4 Backend Testing
-Tests all auth endpoints, decision intelligence features, new schema, and Phase 4 features:
+Smart Decision AI Phase 5 Backend Testing - EXECUTION ENGINE
+Tests all auth endpoints, decision intelligence features, and Phase 5 execution engine:
 - Factor suggestion endpoint
-- Enhanced analysis with factors
-- New schema fields (factor_ratings, scenarios, future_impact, assumptions, bias_flags)
+- Enhanced analysis with factors and user_level
+- Phase 4 schema fields (factor_ratings, scenarios, future_impact, assumptions, bias_flags)
+- Phase 5 execution engine fields (key_reasons, expected_outcome, risks, automation_layer, kpis, monetization, scorecard)
+- Action buttons with real tool URLs and automation shortcuts
 """
 import requests
 import sys
@@ -316,7 +318,10 @@ class SmartDecisionAPITester:
                 
                 if status == 'completed':
                     result = status_response.get('result', {})
-                    return self.validate_phase4_schema(result, factor_weights)
+                    # First validate basic Phase 4 schema, then Phase 5 additions
+                    basic_valid = self.validate_basic_schema(result)
+                    phase5_valid = self.validate_phase5_additions(result)
+                    return basic_valid and phase5_valid
                 elif status == 'failed':
                     error = status_response.get('error', 'Unknown error')
                     self.log_test("Analysis Completion", False, f"Analysis failed: {error}")
@@ -325,7 +330,324 @@ class SmartDecisionAPITester:
         self.log_test("Analysis Timeout", False, f"Analysis did not complete within {max_wait} seconds")
         return False
 
-    def validate_phase4_schema(self, result, factors):
+    def test_decision_analysis_with_factors_phase5(self):
+        """Test decision analysis with Phase 5 execution engine features"""
+        print("\n🔍 Testing Phase 5 - Decision Analysis with Execution Engine...")
+        
+        # Test the specific payload from the review request
+        decision_text = "Launch a productized newsletter writing service"
+        analyze_data = {
+            "decision": decision_text,
+            "answers": [],
+            "factors": [{"name": "Revenue", "weight": 80}],
+            "user_level": "intermediate"
+        }
+        
+        success, start_response = self.run_test("Start Phase 5 Analysis Job", "POST", "decisions/analyze/start", 200, analyze_data)
+        if not success:
+            return False
+        
+        job_id = start_response.get('job_id')
+        if not job_id:
+            self.log_test("Phase 5 Analysis Job ID", False, "No job_id returned")
+            return False
+        
+        print(f"   Job ID: {job_id}")
+        
+        # Poll for completion (up to 120 seconds as specified)
+        max_wait = 120
+        start_time = time.time()
+        
+        while time.time() - start_time < max_wait:
+            time.sleep(5)  # Longer wait for Phase 5 analysis
+            success, status_response = self.run_test(f"Check Phase 5 Analysis Status", "GET", f"decisions/analyze/status/{job_id}", 200)
+            
+            if success:
+                status = status_response.get('status')
+                print(f"   Status: {status}")
+                
+                if status == 'completed':
+                    result = status_response.get('result', {})
+                    return self.validate_phase5_schema(result)
+                elif status == 'failed':
+                    error = status_response.get('error', 'Unknown error')
+                    self.log_test("Phase 5 Analysis Completion", False, f"Analysis failed: {error}")
+                    return False
+        
+        self.log_test("Phase 5 Analysis Timeout", False, f"Analysis did not complete within {max_wait} seconds")
+        return False
+
+    def validate_basic_schema(self, result):
+        """Validate basic decision schema"""
+        required_fields = ['options', 'best_option_id', 'reasoning', 'confidence', 'goal', 'key_insights']
+        
+        for field in required_fields:
+            if field not in result:
+                self.log_test(f"Basic Schema - {field}", False, f"Missing required field: {field}")
+                return False
+            else:
+                self.log_test(f"Basic Schema - {field}", True)
+        return True
+
+    def validate_phase5_additions(self, result):
+        """Validate Phase 5 specific additions"""
+        phase5_fields = {
+            'key_reasons': list,
+            'expected_outcome': dict,
+            'risks': list,
+            'automation_layer': list,
+            'kpis': list,
+            'monetization': dict,
+            'scorecard': dict
+        }
+        
+        all_valid = True
+        for field, expected_type in phase5_fields.items():
+            if field in result:
+                value = result[field]
+                if isinstance(value, expected_type):
+                    self.log_test(f"Phase5 Schema - {field}", True)
+                else:
+                    self.log_test(f"Phase5 Schema - {field}", False, f"Wrong type: expected {expected_type.__name__}, got {type(value).__name__}")
+                    all_valid = False
+            else:
+                self.log_test(f"Phase5 Schema - {field}", False, f"Missing Phase 5 field: {field}")
+                all_valid = False
+        
+        return all_valid
+        """Validate the Phase 5 Execution Engine schema"""
+        print("\n🔍 Validating Phase 4 Decision Intelligence Schema...")
+        
+        required_fields = ['options', 'best_option_id', 'reasoning', 'confidence', 'goal', 'key_insights']
+        phase4_fields = ['assumptions', 'bias_flags', 'factors_used']
+        
+        # Check top-level fields
+        for field in required_fields:
+            if field not in result:
+                self.log_test(f"Schema - {field}", False, f"Missing required field: {field}")
+                return False
+            else:
+                self.log_test(f"Schema - {field}", True)
+        
+        # Check Phase 4 fields
+        for field in phase4_fields:
+            if field in result:
+                self.log_test(f"Phase4 Schema - {field}", True)
+            else:
+                self.log_test(f"Phase4 Schema - {field}", False, f"Missing Phase 4 field: {field}")
+        
+        # Check options have Phase 4 extended fields
+        options = result.get('options', [])
+        if len(options) < 3:
+            self.log_test("Schema - Options Count", False, f"Expected >=3 options, got {len(options)}")
+            return False
+        
+        # Check for "Do nothing" option
+        do_nothing_found = any(opt.get('is_do_nothing') for opt in options)
+        self.log_test("Phase4 Schema - Do Nothing Option", do_nothing_found, "No 'do nothing' option found" if not do_nothing_found else "")
+        
+        phase4_option_fields = ['factor_ratings', 'scenarios', 'future_impact']
+        
+        for i, option in enumerate(options[:2]):  # Check first 2 options
+            # Check factor_ratings
+            factor_ratings = option.get('factor_ratings', {})
+            if factor_ratings:
+                self.log_test(f"Phase4 Schema - Option {i+1} factor_ratings", True)
+                # Check if ratings exist for provided factors
+                factor_names = [f['name'] for f in factors]
+                for factor_name in factor_names:
+                    if factor_name in factor_ratings:
+                        rating = factor_ratings[factor_name]
+                        if isinstance(rating, (int, float)) and 0 <= rating <= 10:
+                            self.log_test(f"Phase4 Schema - Option {i+1} {factor_name} rating", True)
+                        else:
+                            self.log_test(f"Phase4 Schema - Option {i+1} {factor_name} rating", False, f"Invalid rating: {rating}")
+            else:
+                self.log_test(f"Phase4 Schema - Option {i+1} factor_ratings", False, "Missing factor_ratings")
+            
+            # Check scenarios
+            scenarios = option.get('scenarios', {})
+            if scenarios:
+                scenario_fields = ['best_case', 'worst_case', 'most_likely']
+                for field in scenario_fields:
+                    if field in scenarios:
+                        self.log_test(f"Phase4 Schema - Option {i+1} scenario {field}", True)
+                    else:
+                        self.log_test(f"Phase4 Schema - Option {i+1} scenario {field}", False, f"Missing scenario field: {field}")
+            else:
+                self.log_test(f"Phase4 Schema - Option {i+1} scenarios", False, "Missing scenarios")
+            
+            # Check future_impact
+            future_impact = option.get('future_impact', {})
+            if future_impact:
+                future_fields = ['one_year', 'five_year']
+                for field in future_fields:
+                    if field in future_impact:
+                        self.log_test(f"Phase4 Schema - Option {i+1} future {field}", True)
+                    else:
+                        self.log_test(f"Phase4 Schema - Option {i+1} future {field}", False, f"Missing future field: {field}")
+            else:
+                self.log_test(f"Phase4 Schema - Option {i+1} future_impact", False, "Missing future_impact")
+        
+        # Check execution plan if present
+        execution_plan = result.get('execution_plan')
+        if execution_plan:
+            plan_fields = ['title', 'total_timeline', 'steps']
+            for field in plan_fields:
+                if field in execution_plan:
+                    self.log_test(f"Schema - Execution Plan {field}", True)
+                else:
+                    self.log_test(f"Schema - Execution Plan {field}", False, f"Missing execution plan field: {field}")
+        
+        # Check assumptions
+        assumptions = result.get('assumptions', [])
+        if assumptions:
+            print(f"   Assumptions: {len(assumptions)} found")
+        
+        # Check bias_flags
+        bias_flags = result.get('bias_flags', [])
+        if bias_flags:
+            print(f"   Bias Flags: {len(bias_flags)} found")
+            for flag in bias_flags:
+                if 'title' in flag and 'message' in flag and 'severity' in flag:
+                    self.log_test(f"Phase4 Schema - Bias Flag Structure", True)
+                else:
+                    self.log_test(f"Phase4 Schema - Bias Flag Structure", False, "Invalid bias flag structure")
+        
+        print(f"   Goal: {result.get('goal', 'N/A')[:100]}...")
+        print(f"   Key Insights: {len(result.get('key_insights', []))} insights")
+        print(f"   Options: {len(options)} options")
+        print(f"   Best Option: {result.get('best_option_id', 'N/A')}")
+        print(f"   Confidence: {result.get('confidence', 'N/A')}%")
+        print(f"   Factors Used: {result.get('factors_used', [])}")
+        
+        return True
+        """Validate the Phase 5 Execution Engine schema"""
+        print("\n🔍 Validating Phase 5 Execution Engine Schema...")
+        
+        # Phase 5 new fields
+        phase5_fields = {
+            'key_reasons': list,
+            'expected_outcome': dict,
+            'risks': list,
+            'automation_layer': list,
+            'kpis': list,
+            'monetization': dict,
+            'scorecard': dict
+        }
+        
+        # Check Phase 5 fields
+        for field, expected_type in phase5_fields.items():
+            if field in result:
+                value = result[field]
+                if isinstance(value, expected_type):
+                    self.log_test(f"Phase5 Schema - {field}", True)
+                    
+                    # Detailed validation for each field
+                    if field == 'key_reasons':
+                        if len(value) >= 3:
+                            self.log_test(f"Phase5 Schema - {field} count", True, f"Found {len(value)} key reasons")
+                        else:
+                            self.log_test(f"Phase5 Schema - {field} count", False, f"Expected >=3 key reasons, got {len(value)}")
+                    
+                    elif field == 'expected_outcome':
+                        outcome_fields = ['revenue_increase', 'cost_savings', 'time_saved', 'non_financial']
+                        for outcome_field in outcome_fields:
+                            if outcome_field in value:
+                                self.log_test(f"Phase5 Schema - expected_outcome.{outcome_field}", True)
+                                
+                                # Check money range structure
+                                if outcome_field in ['revenue_increase', 'cost_savings'] and isinstance(value[outcome_field], dict):
+                                    money_range = value[outcome_field]
+                                    range_fields = ['realistic_low', 'realistic_high', 'best_case']
+                                    for range_field in range_fields:
+                                        if range_field in money_range:
+                                            self.log_test(f"Phase5 Schema - {outcome_field}.{range_field}", True)
+                    
+                    elif field == 'risks':
+                        if len(value) > 0:
+                            risk_fields = ['risk', 'severity', 'probability', 'mitigation']
+                            for i, risk_item in enumerate(value[:2]):  # Check first 2 risks
+                                for risk_field in risk_fields:
+                                    if risk_field in risk_item:
+                                        self.log_test(f"Phase5 Schema - risks[{i}].{risk_field}", True)
+                                    else:
+                                        self.log_test(f"Phase5 Schema - risks[{i}].{risk_field}", False, f"Missing risk field: {risk_field}")
+                    
+                    elif field == 'automation_layer':
+                        if len(value) > 0:
+                            auto_fields = ['area', 'tools', 'how_it_helps', 'plug_and_play']
+                            for i, auto_item in enumerate(value[:2]):  # Check first 2 automation ideas
+                                for auto_field in auto_fields:
+                                    if auto_field in auto_item:
+                                        self.log_test(f"Phase5 Schema - automation_layer[{i}].{auto_field}", True)
+                    
+                    elif field == 'kpis':
+                        if len(value) > 0:
+                            kpi_fields = ['name', 'how_to_measure', 'target', 'leading_indicator']
+                            for i, kpi_item in enumerate(value[:2]):  # Check first 2 KPIs
+                                for kpi_field in kpi_fields:
+                                    if kpi_field in kpi_item:
+                                        self.log_test(f"Phase5 Schema - kpis[{i}].{kpi_field}", True)
+                    
+                    elif field == 'monetization':
+                        monetization_fields = ['services', 'products', 'upsells']
+                        for mon_field in monetization_fields:
+                            if mon_field in value:
+                                self.log_test(f"Phase5 Schema - monetization.{mon_field}", True)
+                    
+                    elif field == 'scorecard':
+                        scorecard_fields = ['score', 'risk_level', 'time_to_result', 'ease_of_execution', 'confidence']
+                        for score_field in scorecard_fields:
+                            if score_field in value:
+                                self.log_test(f"Phase5 Schema - scorecard.{score_field}", True)
+                            else:
+                                self.log_test(f"Phase5 Schema - scorecard.{score_field}", False, f"Missing scorecard field: {score_field}")
+                
+                else:
+                    self.log_test(f"Phase5 Schema - {field}", False, f"Wrong type: expected {expected_type.__name__}, got {type(value).__name__}")
+            else:
+                self.log_test(f"Phase5 Schema - {field}", False, f"Missing Phase 5 field: {field}")
+        
+        # Check execution plan has Phase 5 enhancements
+        execution_plan = result.get('execution_plan')
+        if execution_plan and 'steps' in execution_plan:
+            steps = execution_plan['steps']
+            if len(steps) > 0:
+                step = steps[0]
+                phase5_step_fields = ['days', 'difficulty', 'action_button']
+                for step_field in phase5_step_fields:
+                    if step_field in step:
+                        self.log_test(f"Phase5 Schema - execution_plan.steps[0].{step_field}", True)
+                        
+                        # Check action button structure
+                        if step_field == 'action_button' and isinstance(step[step_field], dict):
+                            action_button = step[step_field]
+                            button_fields = ['label', 'tool', 'url', 'instruction', 'automation_shortcut']
+                            for button_field in button_fields:
+                                if button_field in action_button:
+                                    self.log_test(f"Phase5 Schema - action_button.{button_field}", True)
+                    else:
+                        self.log_test(f"Phase5 Schema - execution_plan.steps[0].{step_field}", False, f"Missing step field: {step_field}")
+        
+        # Print summary of Phase 5 fields
+        print(f"   Key Reasons: {len(result.get('key_reasons', []))} items")
+        print(f"   Expected Outcome: {bool(result.get('expected_outcome'))}")
+        print(f"   Risks: {len(result.get('risks', []))} items")
+        print(f"   Automation Layer: {len(result.get('automation_layer', []))} items")
+        print(f"   KPIs: {len(result.get('kpis', []))} items")
+        print(f"   Monetization: {bool(result.get('monetization'))}")
+        print(f"   Scorecard: {bool(result.get('scorecard'))}")
+        
+        if result.get('scorecard'):
+            scorecard = result['scorecard']
+            print(f"   Scorecard Score: {scorecard.get('score', 'N/A')}")
+            print(f"   Scorecard Risk: {scorecard.get('risk_level', 'N/A')}")
+            print(f"   Scorecard Time: {scorecard.get('time_to_result', 'N/A')}")
+            print(f"   Scorecard Ease: {scorecard.get('ease_of_execution', 'N/A')}")
+            print(f"   Scorecard Confidence: {scorecard.get('confidence', 'N/A')}")
+        
+        return True
         """Validate the Phase 4 Decision Intelligence schema"""
         print("\n🔍 Validating Phase 4 Decision Intelligence Schema...")
         
@@ -524,7 +846,7 @@ class SmartDecisionAPITester:
 
     def run_all_tests(self):
         """Run all backend tests"""
-        print("🚀 Starting Smart Decision AI Phase 4 Backend Tests")
+        print("🚀 Starting Smart Decision AI Phase 5 Backend Tests")
         print(f"Testing against: {self.base_url}")
         print("=" * 60)
         
@@ -548,6 +870,9 @@ class SmartDecisionAPITester:
         # Phase 4 specific tests
         self.test_suggest_factors()
         self.test_decision_analysis_with_factors()
+        
+        # Phase 5 specific tests
+        self.test_decision_analysis_with_factors_phase5()
         
         # Saved decisions tests
         self.test_save_decision()

@@ -1,46 +1,26 @@
 [
   {
-    "content": "Phase 4: Backend - /suggest-factors + extended schema + 'Do nothing' option + bias/assumptions",
+    "content": "Phase 5: Backend - extended schema with Execution Engine fields",
     "status": "completed"
   },
   {
-    "content": "Phase 4: Backend - conversational follow-up tone",
+    "content": "Phase 5: Backend - 'Decision Execution Engine' prompt + user_level",
     "status": "completed"
   },
   {
-    "content": "Phase 4: Frontend - client-side scoring engine (weights x ratings)",
+    "content": "Phase 5: Frontend - Expected Outcome / Risk Analysis / KPIs / Automation / Monetization / Scorecard / Key Reasons components",
     "status": "completed"
   },
   {
-    "content": "Phase 4: Frontend - Priorities wizard step (AI-suggested factors + sliders + custom add)",
+    "content": "Phase 5: Frontend - Enhanced ExecutionPlanCard with difficulty badges + 'Start Now' action buttons per step",
     "status": "completed"
   },
   {
-    "content": "Phase 4: Frontend - Evaluation Matrix (heat map, editable ratings override)",
+    "content": "Phase 5: Frontend - New 'Execute' tab bundling all sections; sidebar scorecard on Overview",
     "status": "completed"
   },
   {
-    "content": "Phase 4: Frontend - Scoring chart (client-side recompute)",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 4: Frontend - Risk Scenarios + Future Impact tabs",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 4: Frontend - Bias Alerts banner + Assumptions card",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 4: Frontend - REWRITE What-if for client-side weight sliders (instant recompute)",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 4: Fix guest save flow (always include guest_id fallback)",
-    "status": "completed"
-  },
-  {
-    "content": "Phase 4: E2E Testing (backend 85%, mobile 100%, frontend 75% - E2E verified by main agent via browser)",
-    "status": "completed"
+    "content": "Phase 5: E2E Testing via Testing Agent",
+    "status": "in_progress"
   }
 ]
