@@ -1,26 +1,38 @@
 [
   {
-    "content": "Extend DecisionResult schema in ai_service.py with optional `debate` and `agent_perspectives` fields",
+    "content": "Design + create debate_service.py (concern extractor, smart-hybrid decide, refinement runner, 'what changed' synthesizer)",
     "status": "completed"
   },
   {
-    "content": "Wire `analyze_decision_multiagent` into server.py `_run_analyze_job` with try/except fallback to legacy `analyze_decision`",
+    "content": "Extend schemas in models/ai_service.py for DebateTurn, RefinedOutput, ConcernExtraction",
     "status": "completed"
   },
   {
-    "content": "Build AgentPerspectiveCard + DebatePanel React components",
+    "content": "Add debate job endpoints in server.py: POST /debate/start, GET /debate/status/{job_id}, POST /debate/continue, POST /debate/revert",
     "status": "completed"
   },
   {
-    "content": "Add Boardroom tab in Results.jsx rendering the 6 agent cards + debate panel",
+    "content": "Persist debate_history on decision document",
     "status": "completed"
   },
   {
-    "content": "Fix event-loop blocking: wrap blocking `litellm.completion` calls in `asyncio.to_thread` so parallel agent runs don't stall `/status` polling",
+    "content": "Frontend API client: startDebate, pollDebate, continueDebate, revertDebate",
     "status": "completed"
   },
   {
-    "content": "Verify end-to-end: multi-agent Boardroom UI, legacy-fallback empty-state, all 8 tabs, light/dark themes",
+    "content": "Build DebateDialog modal (compose → clarify → processing) with polling",
+    "status": "completed"
+  },
+  {
+    "content": "Build DebatePanel + DebateTurnCard components (with history trail, before/after, confidence delta, next action, revert)",
+    "status": "completed"
+  },
+  {
+    "content": "Wire Challenge button in Results header + new Debate tab",
+    "status": "completed"
+  },
+  {
+    "content": "Backend + frontend E2E verification via playwright + seeded demo + real HTTP round-trip",
     "status": "completed"
   }
 ]

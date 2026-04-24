@@ -19,8 +19,17 @@ from ai_service import (
     FollowUpsResponse,
     DecisionResult,
     SuggestFactorsResponse,
+    DebateStartPayload,
+    DebateContinuePayload,
+    DebateTurn,
+    DebateClarifyingAnswer,
 )
 from multi_agent_service import analyze_decision_multiagent
+from debate_service import (
+    extract_concerns_and_decide,
+    run_refined_analysis,
+    synthesize_what_changed,
+)
 from auth_service import (
     SignupRequest,
     LoginRequest,
@@ -89,6 +98,7 @@ class DecisionSummary(BaseModel):
 
 
 class DecisionDocument(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     id: str
     guest_id: Optional[str] = None
     user_id: Optional[str] = None
@@ -98,6 +108,7 @@ class DecisionDocument(BaseModel):
     result: Dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    debate_history: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 # ===================== Helpers =====================
@@ -310,6 +321,225 @@ async def api_analyze_status(job_id: str):
     elif job["status"] == "failed":
         resp["error"] = job.get("error", "Unknown error")
     return resp
+
+
+# ===================== Debate & Refinement Mode (Phase 7) =====================
+# In-memory job store for debate jobs. Each job holds the entire refinement
+# context so we can resume from needs_clarification when the user answers.
+_debate_jobs: Dict[str, Dict[str, Any]] = {}
+
+
+def _prune_old_debate_jobs() -> None:
+    now = datetime.now(timezone.utc)
+    stale = [
+        jid for jid, j in _debate_jobs.items()
+        if (now - j.get("created_at", now)).total_seconds() > _JOB_TTL_SECONDS
+    ]
+    for jid in stale:
+        _debate_jobs.pop(jid, None)
+
+
+async def _run_debate_extract(job_id: str) -> None:
+    """Stage 1 of a debate job — extract concerns and decide whether to ask
+    clarifying questions. Updates the job in place."""
+    job = _debate_jobs.get(job_id)
+    if not job:
+        return
+    try:
+        extraction = await extract_concerns_and_decide(
+            job["decision"], job["original_result"], job["objection"],
+        )
+        job["extraction"] = extraction.model_dump()
+        if extraction.needs_clarification and extraction.clarifying_questions:
+            job["status"] = "needs_clarification"
+        else:
+            # Proceed straight to refinement
+            await _run_debate_refine(job_id)
+    except Exception as e:
+        logger.exception("debate extract job %s failed", job_id)
+        job["status"] = "failed"
+        job["error"] = str(e)[:400]
+
+
+async def _run_debate_refine(job_id: str) -> None:
+    """Stages 2 + 3 of a debate job — re-run 6-agent Boardroom + synthesize diff."""
+    job = _debate_jobs.get(job_id)
+    if not job:
+        return
+    try:
+        from ai_service import ConcernExtraction as _CE
+        extraction = _CE(**(job.get("extraction") or {}))
+        job["status"] = "refining"
+        revised, engine_used = await run_refined_analysis(
+            decision=job["decision"],
+            prior_answers=job.get("prior_answers") or [],
+            prior_factors=job.get("prior_factors") or [],
+            objection=job["objection"],
+            extraction=extraction,
+            clarifying_answers=job.get("clarifying_answers") or [],
+            user_level=job.get("user_level", "intermediate"),
+        )
+        revised_dict = revised.model_dump()
+        revised_dict["_engine"] = engine_used
+
+        refinement = await synthesize_what_changed(
+            original_result=job["original_result"],
+            revised_result=revised_dict,
+            objection=job["objection"],
+            extraction=extraction,
+        )
+
+        # Build the DebateTurn record
+        turn = DebateTurn(
+            created_at=datetime.now(timezone.utc).isoformat(),
+            objection=job["objection"],
+            concern_extraction=extraction,
+            clarifying_answers=[DebateClarifyingAnswer(**a) for a in (job.get("clarifying_answers") or [])],
+            refined_result=revised_dict,
+            refinement=refinement,
+            engine=engine_used,
+        )
+
+        # Persist on the decision document
+        owner = _owner_filter(job.get("user_id"), job.get("guest_id"))
+        if owner:
+            owner["id"] = job["decision_id"]
+            await db.decisions.update_one(
+                owner,
+                {
+                    "$push": {"debate_history": turn.model_dump()},
+                    "$set": {"updated_at": datetime.now(timezone.utc).isoformat()},
+                },
+            )
+
+        job["status"] = "completed"
+        job["turn"] = turn.model_dump()
+    except Exception as e:
+        logger.exception("debate refine job %s failed", job_id)
+        job["status"] = "failed"
+        job["error"] = str(e)[:400]
+
+
+@api_router.post("/decisions/{decision_id}/debate/start")
+async def api_debate_start(
+    decision_id: str,
+    payload: DebateStartPayload,
+    guest_id: Optional[str] = Query(default=None),
+    user_payload: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Kick off a debate job against an existing (saved) decision."""
+    _prune_old_debate_jobs()
+    user_id = user_payload.get("sub") if user_payload else None
+    q = _owner_filter(user_id, guest_id)
+    if not q:
+        raise HTTPException(status_code=400, detail="Missing owner (auth or guest_id)")
+    q["id"] = decision_id
+    doc = await db.decisions.find_one(q, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Decision not found")
+
+    # The "original result" that the user is objecting to is the most recent
+    # active one — either the last debate turn's refined result, or the base result.
+    debate_history = doc.get("debate_history") or []
+    if debate_history:
+        last_turn = debate_history[-1]
+        original_result = last_turn.get("refined_result") or doc.get("result") or {}
+    else:
+        original_result = doc.get("result") or {}
+
+    # Reconstruct prior factors list from the stored factors_used if available
+    factors_used = original_result.get("factors_used") or []
+    prior_factors = [{"name": f, "weight": 50} for f in factors_used]
+
+    job_id = str(uuid.uuid4())
+    _debate_jobs[job_id] = {
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc),
+        "decision_id": decision_id,
+        "user_id": user_id,
+        "guest_id": guest_id if not user_id else None,
+        "decision": doc.get("decision") or "",
+        "original_result": original_result,
+        "prior_answers": doc.get("answers") or [],
+        "prior_factors": prior_factors,
+        "user_level": "intermediate",
+        "objection": payload.objection,
+        "clarifying_answers": [],
+    }
+    asyncio.create_task(_run_debate_extract(job_id))
+    return {"job_id": job_id, "status": "pending"}
+
+
+@api_router.get("/decisions/debate/status/{job_id}")
+async def api_debate_status(job_id: str):
+    job = _debate_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Debate job not found")
+    resp: Dict[str, Any] = {"status": job["status"]}
+    if job["status"] == "needs_clarification":
+        resp["extraction"] = job.get("extraction")
+    elif job["status"] == "completed":
+        resp["turn"] = job.get("turn")
+    elif job["status"] == "failed":
+        resp["error"] = job.get("error", "Unknown error")
+    return resp
+
+
+@api_router.post("/decisions/debate/{job_id}/continue")
+async def api_debate_continue(job_id: str, payload: DebateContinuePayload):
+    """User answered the clarifying questions — resume the job into Stage 2+3."""
+    job = _debate_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Debate job not found")
+    if job["status"] != "needs_clarification":
+        raise HTTPException(status_code=400, detail=f"Job is in status '{job['status']}', not 'needs_clarification'")
+    job["clarifying_answers"] = [a.model_dump() for a in payload.answers]
+    job["status"] = "refining"
+    asyncio.create_task(_run_debate_refine(job_id))
+    return {"job_id": job_id, "status": "refining"}
+
+
+@api_router.post("/decisions/{decision_id}/debate/revert")
+async def api_debate_revert(
+    decision_id: str,
+    body: Dict[str, Any],
+    guest_id: Optional[str] = Query(default=None),
+    user_payload: Optional[Dict[str, Any]] = Depends(get_current_user_optional),
+):
+    """Truncate the debate_history up to (and including) a target turn_id.
+    Pass turn_id = null or omit to revert to the original decision (drop all turns).
+    """
+    user_id = user_payload.get("sub") if user_payload else None
+    q = _owner_filter(user_id, guest_id)
+    if not q:
+        raise HTTPException(status_code=400, detail="Missing owner (auth or guest_id)")
+    q["id"] = decision_id
+    doc = await db.decisions.find_one(q, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Decision not found")
+    target_turn_id = (body or {}).get("turn_id")
+    history = doc.get("debate_history") or []
+    if target_turn_id is None:
+        new_history: List[Dict[str, Any]] = []
+    else:
+        new_history = []
+        for turn in history:
+            new_history.append(turn)
+            if turn.get("id") == target_turn_id:
+                break
+        # If target wasn't found, leave history unchanged
+        if all(t.get("id") != target_turn_id for t in history):
+            raise HTTPException(status_code=404, detail="Turn not found in debate history")
+    await db.decisions.update_one(
+        q,
+        {
+            "$set": {
+                "debate_history": new_history,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        },
+    )
+    return {"ok": True, "debate_history_length": len(new_history)}
 
 
 # ===================== Saved decisions (scoped by user_id OR guest_id) =====================

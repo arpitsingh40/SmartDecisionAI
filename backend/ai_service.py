@@ -292,6 +292,91 @@ class AnalyzePayload(BaseModel):
     user_level: Literal["beginner", "intermediate", "advanced"] = "intermediate"
 
 
+# ============================================================================
+# Phase 7 — Debate & Refinement Mode
+# ============================================================================
+class DebateClarifyingQuestion(BaseModel):
+    model_config = {"extra": "allow"}
+    id: str = Field(default_factory=lambda: f"cq_{uuid.uuid4().hex[:8]}")
+    question: str
+    help_text: Optional[str] = None
+
+
+class DebateClarifyingAnswer(BaseModel):
+    model_config = {"extra": "allow"}
+    id: str
+    question: str
+    answer: str
+
+
+class DebateConcern(BaseModel):
+    model_config = {"extra": "allow"}
+    text: str
+    category: Literal["risk", "feasibility", "cost", "time", "personal", "other"] = "other"
+
+
+class ConcernExtraction(BaseModel):
+    """Stage 1 output — what the user is actually worried about,
+    plus whether we need to ask clarifying questions before re-running.
+    """
+    model_config = {"extra": "allow"}
+    summary: str = Field(default="", max_length=300)
+    concerns: List[DebateConcern] = Field(default_factory=list, max_length=6)
+    assumption_gaps: List[str] = Field(default_factory=list, max_length=6)
+    needs_clarification: bool = False
+    clarifying_questions: List[DebateClarifyingQuestion] = Field(default_factory=list, max_length=3)
+
+
+class DiffItem(BaseModel):
+    model_config = {"extra": "allow"}
+    topic: str
+    before: str = ""
+    after: str = ""
+
+
+class UpdatedOutcomeSnapshot(BaseModel):
+    model_config = {"extra": "allow"}
+    revenue_or_savings: Optional[str] = None          # e.g. "+$1.8k/yr", "$300-500/mo saved"
+    probability_pct: Optional[conint(ge=0, le=100)] = None
+    timeframe: Optional[str] = None                   # e.g. "30-60 days"
+
+
+class RefinementOutput(BaseModel):
+    """Stage 3 output — the 'UPDATED OUTPUT' block the UI renders per turn."""
+    model_config = {"extra": "allow"}
+    updated_decision_verdict: Literal["keep", "modify", "change"] = "modify"
+    what_changed_summary: str = Field(default="", max_length=500)
+    key_diffs: List[DiffItem] = Field(default_factory=list, max_length=6)
+    updated_outcome: Optional[UpdatedOutcomeSnapshot] = None
+    strengths: List[str] = Field(default_factory=list, max_length=5)
+    weaknesses: List[str] = Field(default_factory=list, max_length=5)
+    execution_adjustments: List[str] = Field(default_factory=list, max_length=5)
+    when_original_wins: str = Field(default="", max_length=400)
+    next_action_24_48h: str = Field(default="", max_length=300)
+    confidence_delta: Dict[str, int] = Field(default_factory=dict)  # {"old": 75, "new": 82}
+
+
+class DebateTurn(BaseModel):
+    """One turn in the debate trail for a decision."""
+    model_config = {"extra": "allow"}
+    id: str = Field(default_factory=lambda: f"turn_{uuid.uuid4().hex[:10]}")
+    created_at: str  # ISO string
+    objection: str
+    concern_extraction: Optional[ConcernExtraction] = None
+    clarifying_answers: List[DebateClarifyingAnswer] = Field(default_factory=list)
+    refined_result: Optional[Dict[str, Any]] = None  # full DecisionResult shape
+    refinement: Optional[RefinementOutput] = None    # the UPDATED OUTPUT block
+    engine: Literal["multi_agent", "legacy_fallback"] = "multi_agent"
+
+
+class DebateStartPayload(BaseModel):
+    objection: str = Field(min_length=4, max_length=800)
+
+
+class DebateContinuePayload(BaseModel):
+    answers: List[DebateClarifyingAnswer] = Field(default_factory=list)
+
+
 # ====================================================================
 # Prompts
 # ====================================================================

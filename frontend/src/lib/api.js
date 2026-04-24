@@ -134,6 +134,109 @@ export async function deleteDecision(id, guestId) {
   return data;
 }
 
+// ================= Debate & Refinement (Phase 7) =================
+/**
+ * Start a debate against a saved decision.
+ * Returns { job_id, status }.
+ */
+export async function startDebate(decisionId, objection, guestId) {
+  const params = {};
+  if (guestId) params.guest_id = guestId;
+  const { data } = await api.post(
+    `/decisions/${decisionId}/debate/start`,
+    { objection },
+    { params },
+  );
+  return data;
+}
+
+/**
+ * Poll a debate job. Status transitions:
+ *   pending -> (needs_clarification | refining) -> completed
+ * Returns the raw JSON { status, extraction?, turn?, error? }.
+ */
+export async function getDebateStatus(jobId) {
+  const { data } = await api.get(`/decisions/debate/status/${jobId}`);
+  return data;
+}
+
+/**
+ * Provide clarifying answers to continue the debate job.
+ * `answers`: [{ id, question, answer }]
+ */
+export async function continueDebate(jobId, answers) {
+  const { data } = await api.post(`/decisions/debate/${jobId}/continue`, { answers });
+  return data;
+}
+
+/**
+ * Revert the debate history. `turnId = null` drops all turns (back to original).
+ */
+export async function revertDebate(decisionId, turnId, guestId) {
+  const params = {};
+  if (guestId) params.guest_id = guestId;
+  const { data } = await api.post(
+    `/decisions/${decisionId}/debate/revert`,
+    { turn_id: turnId },
+    { params },
+  );
+  return data;
+}
+
+/**
+ * High-level helper: runs a full debate turn (optionally with mid-flight
+ * clarifying-question callback). Resolves with the completed turn or rejects.
+ *
+ * @param opts.decisionId    Saved decision id
+ * @param opts.objection     User's free-text challenge
+ * @param opts.guestId       Guest id if unauthed
+ * @param opts.onStatus      (status, data) callback for UI updates
+ * @param opts.onClarify     async fn({questions}) => answers[]  — called when we
+ *                           need clarifications; should resolve with the user's
+ *                           answers in the shape [{id, question, answer}].
+ */
+export async function runDebateTurn({ decisionId, objection, guestId, onStatus, onClarify }) {
+  const { job_id: jobId } = await startDebate(decisionId, objection, guestId);
+  if (onStatus) onStatus('pending', { jobId });
+
+  const deadline = Date.now() + 300000; // 5 min hard cap (full 6-agent re-run)
+  let delay = 1500;
+  let askedClarification = false;
+
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, delay));
+    let data;
+    try {
+      data = await getDebateStatus(jobId);
+    } catch (e) {
+      if (e?.response?.status === 404) throw new Error('Debate job not found');
+      continue;
+    }
+
+    if (onStatus) onStatus(data.status, data);
+
+    if (data.status === 'completed') return data.turn;
+    if (data.status === 'failed') {
+      const err = new Error(data.error || 'Debate failed');
+      err.response = { data: { detail: data.error } };
+      throw err;
+    }
+    if (data.status === 'needs_clarification' && !askedClarification) {
+      askedClarification = true;
+      const questions = data.extraction?.clarifying_questions || [];
+      if (!onClarify) {
+        throw new Error('Clarifications needed but no handler provided');
+      }
+      const answers = await onClarify({ questions, extraction: data.extraction });
+      await continueDebate(jobId, answers || []);
+      delay = 2000; // back off a touch while the refinement runs
+      continue;
+    }
+    delay = Math.min(delay + 300, 2500);
+  }
+  throw new Error('Debate timed out (please try again)');
+}
+
 // ================= Wizard draft (client-only) =================
 const DRAFT_KEY = 'sda_wizard_draft_v1';
 

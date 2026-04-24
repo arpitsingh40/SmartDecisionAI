@@ -32,6 +32,7 @@
 - ✅ Phase 3 complete (Decision Intelligence upgrade + auth + deeper tools).
 - ✅ Phase 4 complete (Structured pipeline + factor-weighted scoring + new tabs + transparency + instant what-if).
 - ✅ Phase 6 complete (Multi-Agent Boardroom + parallel 6-agent synthesis + debate UI + event-loop fix + legacy auto-fallback).
+- ✅ Phase 7 complete (Interactive Debate & Refinement Mode — smart-hybrid clarification + full 6-agent re-run + structured what-changed diff + history trail + confidence delta banner).
 
 ---
 
@@ -234,6 +235,87 @@ the service completed in ~153s with full 6-agent output + debate; (2) a
 seeded Boardroom payload was rendered in the UI and all interactive elements
 (tab navigation, expand/collapse, debate conflicts, convergence) were
 verified via screenshots in both themes.
+
+---
+
+### Phase 7 — Interactive Debate & Refinement Mode (Status: COMPLETED)
+**Goal:** Turn Smart Decision AI from a report generator into a decision partner.
+When a user disagrees with the output, they press **"Challenge this decision"**
+and the system extracts concerns, optionally asks 1–3 targeted clarifications,
+then re-runs the full 6-agent Boardroom with the updated context and produces
+a structured "what changed / why / next action" comparison.
+
+**Backend — completed**
+- [x] `debate_service.py` with three stages:
+      - `extract_concerns_and_decide(decision, prior_result, objection)` — summarizes
+        user concerns (auto-categorized: risk / feasibility / cost / time / personal),
+        identifies assumption gaps, and decides if 1-3 clarifying questions
+        are needed.
+      - `run_refined_analysis(...)` — runs the full 6-agent Boardroom with the
+        objection + concerns + clarifying answers injected as extra pseudo-
+        answers. Falls back to `analyze_decision` legacy if Boardroom fails.
+      - `synthesize_what_changed(...)` — one focused LLM call producing the
+        UPDATED OUTPUT block: verdict, what-changed summary, key diffs,
+        updated outcome, strengths, weaknesses, execution adjustments,
+        when-original-wins, next-action-24-48h, confidence delta.
+- [x] New schemas in `ai_service.py`: `ConcernExtraction`, `RefinementOutput`,
+      `DebateTurn`, `DebateClarifyingQuestion`, etc.
+- [x] Four new async endpoints in `server.py`:
+      - `POST /api/decisions/{id}/debate/start` (returns `job_id`)
+      - `GET  /api/decisions/debate/status/{job_id}` (pending /
+        needs_clarification / refining / completed / failed)
+      - `POST /api/decisions/debate/{job_id}/continue` (submit clarification
+        answers)
+      - `POST /api/decisions/{id}/debate/revert` (truncate history to a
+        specific turn; pass `{"turn_id": null}` to drop all refinements)
+- [x] `debate_history: List[DebateTurn]` persisted on the decision document;
+      scoped to owner (user_id or guest_id).
+
+**Frontend — completed**
+- [x] `api.js` helpers: `startDebate`, `getDebateStatus`, `continueDebate`,
+      `revertDebate`, and a high-level `runDebateTurn({decisionId, objection,
+      onStatus, onClarify})` that encapsulates the full polling +
+      clarification round-trip.
+- [x] `components/debate/DebateDialog.jsx` — modal with 3 states:
+      compose (textarea + 4 example chips), clarify (up to 3 clarifying
+      questions inline), processing (spinner + contextual status).
+- [x] `components/debate/DebateTurnCard.jsx` — renders one turn with:
+      user's objection quote, category-tinted concern chips, confidence
+      delta banner (green/red with ± pts pill), "What changed & why"
+      primary callout, before/after diff cards, updated outcome 3-column
+      grid (revenue/probability/timeframe), strengths vs. remaining
+      trade-offs, execution adjustments, when-original-wins callout,
+      **Next action (24-48h)** highlighted CTA, collapsible body,
+      per-turn Revert button.
+- [x] `components/debate/DebatePanel.jsx` — empty-state with CTA when no
+      history, history header with "Revert to original" + "Challenge again"
+      actions, and the list of turn cards.
+- [x] `Results.jsx`:
+      - Added **Challenge** button in the header (disabled until saved).
+      - Added **Debate** tab with live count (`Debate (2)`).
+      - Added "refined" banner at the top when the active result is a
+        refinement, linking to the Debate tab.
+      - Most importantly: **the active result used across all tabs
+        (Overview, Boardroom, Execute, Evaluation, etc.) auto-derives
+        from the latest refinement turn** when any exist. Reverting a
+        turn updates every tab consistently.
+
+**End-to-end verification**
+- Seeded a decision with 2 debate turns via direct DB write + re-loaded via
+  the production UI; verified all 3 refinement cards render with objections,
+  concerns, confidence delta banners, before/after diffs, updated outcomes,
+  strengths/weaknesses, and next-action CTAs (both dark and light themes).
+- Ran a LIVE HTTP debate-start against the seeded decision: Stage 1 produced
+  3 high-quality clarifying questions in ~8 s; continue-call accepted
+  answers; status transitioned pending → needs_clarification → refining.
+  Stage 2 fell back to legacy analyzer due to transient LLM provider 502s
+  (observed + handled gracefully). Stage 3 synthesis completed and produced
+  a real Refinement #3 that correctly flipped the best pick from Metro
+  hybrid to Buy Corolla after the "3-month-old baby" objection — visible on
+  the Debate tab within the UI.
+- Event loop stayed responsive throughout the slow LLM runs thanks to the
+  `asyncio.to_thread` wrapper around blocking `litellm.completion` calls
+  introduced in Phase 6.
 
 ---
 
