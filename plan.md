@@ -31,6 +31,7 @@
 - ✅ Phase 2 complete (full V1 app implemented + end-to-end tested).
 - ✅ Phase 3 complete (Decision Intelligence upgrade + auth + deeper tools).
 - ✅ Phase 4 complete (Structured pipeline + factor-weighted scoring + new tabs + transparency + instant what-if).
+- ✅ Phase 6 complete (Multi-Agent Boardroom + parallel 6-agent synthesis + debate UI + event-loop fix + legacy auto-fallback).
 
 ---
 
@@ -176,14 +177,74 @@
 ---
 
 ## 3) Next Actions
-**Current status:** v1.2 Structured Decision Engine is complete.
+**Current status:** v1.3 Multi-Agent Decision System — in progress.
 
-Recommended next actions (optional):
-1. **Test stabilization:** reduce timing flakiness in automated E2E by increasing waits around async analyze completion.
-2. **Editable rating overrides → persisted:** wire EvaluationMatrix edit-mode to update local state and optionally persist overrides into the saved decision.
-3. **Observability:** add trace IDs and endpoint latency metrics.
-4. **Sharing:** read-only share links.
-5. **Account settings:** change password, update profile.
+### Phase 6 — Multi-Agent Decision System (Status: COMPLETED)
+**Goal:** Replace the single-prompt analyze with a 6-agent panel + synthesizer,
+producing "boardroom-level" intelligence (disagreement + resolution).
+
+**User-confirmed scope for this pass:**
+- a) Wire the 6-agent + synthesizer pipeline into the existing async `/analyze` job
+- b) Add `debate` + `agent_perspectives` fields to DecisionResult so the UI can render them
+- c) Add a new **Boardroom** tab in Results with 6 agent cards + debate panel
+- d) Run backend + frontend tests
+- On synthesizer failure → **auto-fallback** to legacy `ai_service.analyze_decision`
+- Skip real-time simulation engine for now (revisit after Boardroom ships)
+- Keep `ai_service.py` as fallback + for `/suggest-factors`
+
+**Backend — completed**
+- [x] Extended `DecisionResult` with optional `debate` (conflicts, trade_offs,
+      convergence) and `agent_perspectives` (Strategic/Financial/Risk/Execution/
+      Contrarian/Optimization). `extra="allow"` on nested models for forward-
+      compatible agent details.
+- [x] `server.py::_run_analyze_job` now calls `analyze_decision_multiagent`
+      first, auto-falling back to `ai_service.analyze_decision` on any
+      exception. Adds `_engine: "multi_agent" | "legacy_fallback"` to the
+      stored result for observability.
+- [x] Defensive list-trimming in synthesizer output before Pydantic
+      validation (prevents spurious ValidationErrors when the LLM is verbose).
+- [x] **Critical event-loop fix:** `ai_service._call_llm` now wraps the
+      blocking `litellm.completion` call (under
+      `emergentintegrations.LlmChat.send_message`) in `asyncio.to_thread`. Six
+      agents running in parallel no longer pin the event loop, so
+      `/analyze/status` polling stays responsive during long runs.
+
+**Frontend — completed**
+- [x] `AgentPerspectiveCard.jsx` — per-agent card with icon chip, colored tone
+      (primary/emerald/rose/amber/indigo/teal), summary, and collapsible
+      details rendering agent-specific keys (EV, payback, risks, leverage, etc.)
+- [x] `DebatePanel.jsx` — numbered conflict cards with 2-column agent views
+      and primary-tinted resolution blocks; trade-offs list + convergence
+      callout in a 2-column grid.
+- [x] `BoardroomPanel.jsx` — 3-column responsive grid of 6 agents in a fixed
+      order; graceful empty-state when data is missing (legacy-fallback runs).
+- [x] New "Boardroom" tab added to `Results.jsx` between Overview and Execute.
+- [x] Verified: multi-agent decision shows 6 cards + debate (3 conflicts,
+      3 trade-offs, convergence). Legacy-fallback decision shows a clean
+      empty-state explaining why the Boardroom is unavailable.
+- [x] Verified: all 8 tabs (Overview / Boardroom / Execute / Evaluation /
+      Scenarios / Future / Compare / What-if) present and functional in
+      both light and dark themes.
+
+**Note on testing:** The testing_agent ran into transient LLM-provider 502s
+during the run, which caused multi-agent synthesis to fall back to the legacy
+analyzer. The fallback worked as designed (user always gets a valid result).
+End-to-end multi-agent runs were verified directly: (1) a Python test against
+the service completed in ~153s with full 6-agent output + debate; (2) a
+seeded Boardroom payload was rendered in the UI and all interactive elements
+(tab navigation, expand/collapse, debate conflicts, convergence) were
+verified via screenshots in both themes.
+
+---
+
+### Backlog (deferred)
+1. Real-time simulation engine (re-run multi-agent on weight change — costly)
+2. Memory layer (learn from past decisions)
+3. User profiling agent
+4. Editable rating overrides persisted
+5. Observability / trace IDs
+6. Read-only share links
+7. Account settings
 
 ---
 

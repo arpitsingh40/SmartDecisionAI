@@ -20,6 +20,7 @@ from ai_service import (
     DecisionResult,
     SuggestFactorsResponse,
 )
+from multi_agent_service import analyze_decision_multiagent
 from auth_service import (
     SignupRequest,
     LoginRequest,
@@ -234,13 +235,33 @@ def _prune_old_jobs() -> None:
 
 
 async def _run_analyze_job(job_id: str, decision: str, answers: List[Dict[str, Any]], factors: List[Dict[str, Any]], user_level: str = "intermediate"):
+    """Primary path: run the 6-agent Boardroom panel + synthesizer.
+    Fallback path: if the multi-agent synthesis fails for ANY reason,
+    fall back to the legacy single-prompt analyzer so users always get a result.
+    """
     try:
-        result = await analyze_decision(decision, answers, factors=factors, user_level=user_level)
+        try:
+            result = await analyze_decision_multiagent(
+                decision, answers, factors=factors, user_level=user_level
+            )
+            engine_used = "multi_agent"
+        except Exception as multi_err:
+            logger.warning(
+                "multi-agent failed for job %s (%s) — falling back to legacy analyzer",
+                job_id, str(multi_err)[:200],
+            )
+            result = await analyze_decision(
+                decision, answers, factors=factors, user_level=user_level
+            )
+            engine_used = "legacy_fallback"
+
         job = _analyze_jobs.get(job_id)
         if job is None:
             return
+        payload = result.model_dump()
+        payload["_engine"] = engine_used
         job["status"] = "completed"
-        job["result"] = result.model_dump()
+        job["result"] = payload
         job["completed_at"] = datetime.now(timezone.utc)
     except Exception as e:
         logger.exception("analyze job %s failed", job_id)

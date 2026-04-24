@@ -1,34 +1,26 @@
 [
   {
-    "content": "Phase 6: Architect multi-agent system - 6 specialized agents (Strategic, Financial, Risk, Execution, Contrarian, Optimization) running in parallel + Synthesizer",
-    "status": "in_progress"
+    "content": "Extend DecisionResult schema in ai_service.py with optional `debate` and `agent_perspectives` fields",
+    "status": "completed"
   },
   {
-    "content": "Phase 6: Backend - /app/backend/multi_agent_service.py with 6 focused agent prompts + synthesizer",
-    "status": "pending"
+    "content": "Wire `analyze_decision_multiagent` into server.py `_run_analyze_job` with try/except fallback to legacy `analyze_decision`",
+    "status": "completed"
   },
   {
-    "content": "Phase 6: Backend - extend DecisionResult schema with agent_perspectives + debate fields",
-    "status": "pending"
+    "content": "Build AgentPerspectiveCard + DebatePanel React components",
+    "status": "completed"
   },
   {
-    "content": "Phase 6: Backend - wire _run_analyze_job to use multi-agent orchestration (asyncio.gather 6 agents + synthesizer)",
-    "status": "pending"
+    "content": "Add Boardroom tab in Results.jsx rendering the 6 agent cards + debate panel",
+    "status": "completed"
   },
   {
-    "content": "Phase 6: Frontend - AgentsPanel component (6 agent cards + Debate/Conflicts section)",
-    "status": "pending"
+    "content": "Fix event-loop blocking: wrap blocking `litellm.completion` calls in `asyncio.to_thread` so parallel agent runs don't stall `/status` polling",
+    "status": "completed"
   },
   {
-    "content": "Phase 6: Frontend - new 'Panel' tab in Results showing the boardroom view",
-    "status": "pending"
-  },
-  {
-    "content": "Phase 6: Compare old vs new system + write design doc (architecture + communication flow)",
-    "status": "pending"
-  },
-  {
-    "content": "Phase 6: E2E Testing via Testing Agent",
-    "status": "pending"
+    "content": "Verify end-to-end: multi-agent Boardroom UI, legacy-fallback empty-state, all 8 tabs, light/dark themes",
+    "status": "completed"
   }
 ]

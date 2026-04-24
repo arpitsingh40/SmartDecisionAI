@@ -1,322 +1,166 @@
 {
   "summary": {
-    "total_tests": 52,
-    "passed_tests": 44,
-    "success_rate": 84.6,
-    "timestamp": "2026-04-23T23:05:17.847362"
+    "total_tests": 26,
+    "passed_tests": 15,
+    "success_rate": 57.7,
+    "timestamp": "2026-04-24T05:33:24.641980"
   },
   "detailed_results": [
     {
       "test": "API Root",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T23:01:58.288736"
+      "timestamp": "2026-04-24T05:27:34.646512"
     },
     {
       "test": "Create Guest Session",
-      "success": false,
-      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
-      "timestamp": "2026-04-23T23:02:28.404140"
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-24T05:27:34.750049"
     },
     {
       "test": "User Signup",
-      "success": false,
-      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
-      "timestamp": "2026-04-23T23:02:58.518773"
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-24T05:27:35.098213"
     },
     {
       "test": "User Login",
-      "success": false,
-      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
-      "timestamp": "2026-04-23T23:03:28.641853"
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-24T05:27:35.437793"
     },
     {
       "test": "Auth Me",
-      "success": false,
-      "details": "No auth token available",
-      "timestamp": "2026-04-23T23:03:28.641883"
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2026-04-24T05:27:35.541732"
     },
     {
       "test": "Signup Invalid Email",
       "success": true,
       "details": "Status: 422",
-      "timestamp": "2026-04-23T23:03:46.628437"
+      "timestamp": "2026-04-24T05:27:35.644328"
+    },
+    {
+      "test": "Login Wrong Password",
+      "success": true,
+      "details": "Status: 401",
+      "timestamp": "2026-04-24T05:27:35.972295"
     },
     {
       "test": "Generate Follow-ups",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T23:03:54.209777"
+      "timestamp": "2026-04-24T05:27:38.773818"
     },
     {
       "test": "Suggest Factors",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T23:03:58.087105"
+      "timestamp": "2026-04-24T05:27:41.361711"
     },
     {
       "test": "Factor Quality",
       "success": true,
       "details": "",
-      "timestamp": "2026-04-23T23:03:58.087733"
+      "timestamp": "2026-04-24T05:27:41.362488"
     },
     {
       "test": "Get Factors for Analysis",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T23:04:00.486831"
+      "timestamp": "2026-04-24T05:27:43.629100"
     },
     {
       "test": "Get Follow-ups for Analysis",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T23:04:03.312872"
+      "timestamp": "2026-04-24T05:27:46.437925"
     },
     {
       "test": "Start Analysis Job with Factors",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T23:04:03.453446"
-    },
-    {
-      "test": "Check Analysis Status",
-      "success": false,
-      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
-      "timestamp": "2026-04-23T23:04:36.557533"
-    },
-    {
-      "test": "Check Analysis Status",
-      "success": false,
-      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
-      "timestamp": "2026-04-23T23:05:09.703994"
+      "timestamp": "2026-04-24T05:27:46.547075"
     },
     {
       "test": "Check Analysis Status",
       "success": true,
       "details": "Status: 200",
-      "timestamp": "2026-04-23T23:05:17.593363"
+      "timestamp": "2026-04-24T05:28:06.901737"
     },
     {
-      "test": "Schema - options",
+      "test": "Check Analysis Status",
       "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594026"
+      "details": "Status: 200",
+      "timestamp": "2026-04-24T05:28:14.657327"
     },
     {
-      "test": "Schema - best_option_id",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594038"
+      "test": "Check Analysis Status",
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-24T05:28:47.750532"
     },
     {
-      "test": "Schema - reasoning",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594042"
+      "test": "Check Analysis Status",
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-24T05:29:20.821257"
     },
     {
-      "test": "Schema - confidence",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594045"
+      "test": "Check Analysis Status",
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-24T05:29:53.930796"
     },
     {
-      "test": "Schema - goal",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594048"
+      "test": "Analysis Timeout",
+      "success": false,
+      "details": "Analysis did not complete within 120 seconds",
+      "timestamp": "2026-04-24T05:29:53.930811"
     },
     {
-      "test": "Schema - key_insights",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594051"
+      "test": "Start Phase 5 Analysis Job",
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-24T05:30:24.045123"
     },
     {
-      "test": "Phase4 Schema - assumptions",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594054"
+      "test": "Start Phase 6 Multi-Agent Analysis",
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-24T05:30:54.129817"
     },
     {
-      "test": "Phase4 Schema - bias_flags",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594061"
-    },
-    {
-      "test": "Phase4 Schema - factors_used",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594064"
-    },
-    {
-      "test": "Phase4 Schema - Do Nothing Option",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594071"
-    },
-    {
-      "test": "Phase4 Schema - Option 1 factor_ratings",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594076"
-    },
-    {
-      "test": "Phase4 Schema - Option 1 Purchase Price rating",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594083"
-    },
-    {
-      "test": "Phase4 Schema - Option 1 Long-term Reliability rating",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594086"
-    },
-    {
-      "test": "Phase4 Schema - Option 1 Fuel Efficiency rating",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594089"
-    },
-    {
-      "test": "Phase4 Schema - Option 1 Vehicle Condition rating",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594092"
-    },
-    {
-      "test": "Phase4 Schema - Option 1 scenario best_case",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594096"
-    },
-    {
-      "test": "Phase4 Schema - Option 1 scenario worst_case",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594099"
-    },
-    {
-      "test": "Phase4 Schema - Option 1 scenario most_likely",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594101"
-    },
-    {
-      "test": "Phase4 Schema - Option 1 future one_year",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594105"
-    },
-    {
-      "test": "Phase4 Schema - Option 1 future five_year",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594108"
-    },
-    {
-      "test": "Phase4 Schema - Option 2 factor_ratings",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594111"
-    },
-    {
-      "test": "Phase4 Schema - Option 2 Purchase Price rating",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594115"
-    },
-    {
-      "test": "Phase4 Schema - Option 2 Long-term Reliability rating",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594118"
-    },
-    {
-      "test": "Phase4 Schema - Option 2 Fuel Efficiency rating",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594121"
-    },
-    {
-      "test": "Phase4 Schema - Option 2 Vehicle Condition rating",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594124"
-    },
-    {
-      "test": "Phase4 Schema - Option 2 scenario best_case",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594127"
-    },
-    {
-      "test": "Phase4 Schema - Option 2 scenario worst_case",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594130"
-    },
-    {
-      "test": "Phase4 Schema - Option 2 scenario most_likely",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594132"
-    },
-    {
-      "test": "Phase4 Schema - Option 2 future one_year",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594139"
-    },
-    {
-      "test": "Phase4 Schema - Option 2 future five_year",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594142"
-    },
-    {
-      "test": "Schema - Execution Plan title",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594146"
-    },
-    {
-      "test": "Schema - Execution Plan total_timeline",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594148"
-    },
-    {
-      "test": "Schema - Execution Plan steps",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594151"
-    },
-    {
-      "test": "Phase4 Schema - Bias Flag Structure",
-      "success": true,
-      "details": "",
-      "timestamp": "2026-04-23T23:05:17.594159"
+      "test": "Seed Boardroom Decision",
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-24T05:31:24.220096"
     },
     {
       "test": "Save Decision",
       "success": false,
-      "details": "Status: 400 (expected 201) - Missing owner (auth or guest_id required)",
-      "timestamp": "2026-04-23T23:05:17.716164"
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-24T05:31:54.324795"
     },
     {
       "test": "List Decisions",
-      "success": true,
-      "details": "Status: 200",
-      "timestamp": "2026-04-23T23:05:17.846465"
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-24T05:32:24.464175"
     },
     {
-      "test": "Auth Scoped Decisions",
+      "test": "List User Decisions",
       "success": false,
-      "details": "No auth token for scoping test",
-      "timestamp": "2026-04-23T23:05:17.847108"
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-24T05:32:54.563333"
+    },
+    {
+      "test": "List Guest Decisions",
+      "success": false,
+      "details": "Error: HTTPSConnectionPool(host='decide-pro-1.preview.emergentagent.com', port=443): Read timed out. (read timeout=30)",
+      "timestamp": "2026-04-24T05:33:24.641811"
     }
   ]
 }

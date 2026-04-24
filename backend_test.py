@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Smart Decision AI Phase 5 Backend Testing - EXECUTION ENGINE
-Tests all auth endpoints, decision intelligence features, and Phase 5 execution engine:
+Smart Decision AI Phase 6 Backend Testing - MULTI-AGENT BOARDROOM
+Tests all auth endpoints, decision intelligence features, and Phase 6 multi-agent system:
 - Factor suggestion endpoint
 - Enhanced analysis with factors and user_level
 - Phase 4 schema fields (factor_ratings, scenarios, future_impact, assumptions, bias_flags)
 - Phase 5 execution engine fields (key_reasons, expected_outcome, risks, automation_layer, kpis, monetization, scorecard)
+- Phase 6 multi-agent fields (debate, agent_perspectives, _engine)
 - Action buttons with real tool URLs and automation shortcuts
+- Multi-agent async job pattern with 60-180s execution time
 """
 import requests
 import sys
@@ -377,6 +379,102 @@ class SmartDecisionAPITester:
         self.log_test("Phase 5 Analysis Timeout", False, f"Analysis did not complete within {max_wait} seconds")
         return False
 
+    def test_multi_agent_analysis_phase6(self):
+        """Test Phase 6 multi-agent analysis with 6 agents + synthesizer"""
+        print("\n🔍 Testing Phase 6 - Multi-Agent Boardroom Analysis...")
+        
+        # Use a decision that will trigger multi-agent analysis
+        decision_text = "Should I buy a used Toyota Corolla for $12k or keep using the metro?"
+        analyze_data = {
+            "decision": decision_text,
+            "answers": [
+                {"question": "Commute?", "answer": "$140/mo metro"},
+                {"question": "Car need?", "answer": "2-3x/week errands"},
+                {"question": "Budget?", "answer": "$350/mo"}
+            ],
+            "factors": [
+                {"name": "Total cost", "weight": 70},
+                {"name": "Convenience", "weight": 60},
+                {"name": "Flexibility", "weight": 50}
+            ],
+            "user_level": "intermediate"
+        }
+        
+        success, start_response = self.run_test("Start Phase 6 Multi-Agent Analysis", "POST", "decisions/analyze/start", 200, analyze_data)
+        if not success:
+            return False
+        
+        job_id = start_response.get('job_id')
+        if not job_id:
+            self.log_test("Phase 6 Analysis Job ID", False, "No job_id returned")
+            return False
+        
+        print(f"   Job ID: {job_id}")
+        print("   ⏳ Multi-agent analysis takes 60-180s (6 agents + synthesizer)...")
+        
+        # Poll for completion (up to 240 seconds for multi-agent)
+        max_wait = 240
+        start_time = time.time()
+        
+        while time.time() - start_time < max_wait:
+            time.sleep(8)  # Longer wait for multi-agent analysis
+            success, status_response = self.run_test(f"Check Multi-Agent Status", "GET", f"decisions/analyze/status/{job_id}", 200)
+            
+            if success:
+                status = status_response.get('status')
+                elapsed = int(time.time() - start_time)
+                print(f"   Status: {status} (elapsed: {elapsed}s)")
+                
+                if status == 'completed':
+                    result = status_response.get('result', {})
+                    return self.validate_phase6_schema(result)
+                elif status == 'failed':
+                    error = status_response.get('error', 'Unknown error')
+                    self.log_test("Phase 6 Analysis Completion", False, f"Multi-agent analysis failed: {error}")
+                    return False
+        
+        self.log_test("Phase 6 Analysis Timeout", False, f"Multi-agent analysis did not complete within {max_wait} seconds")
+        return False
+
+    def test_boardroom_payload_seeding(self):
+        """Test seeding a pre-made boardroom decision for frontend testing"""
+        print("\n🔍 Testing Boardroom Payload Seeding...")
+        
+        # Load the pre-made boardroom payload
+        try:
+            with open('/tmp/boardroom_payload.json', 'r') as f:
+                payload = json.load(f)
+            
+            # Add guest_id if not authenticated
+            if not self.token and self.guest_id:
+                payload["guest_id"] = self.guest_id
+            
+            success, response = self.run_test("Seed Boardroom Decision", "POST", "decisions", 201, payload)
+            if success and 'id' in response:
+                self.boardroom_decision_id = response['id']
+                print(f"   Seeded Boardroom Decision ID: {self.boardroom_decision_id}")
+                
+                # Verify the seeded decision has boardroom structure
+                params = ""
+                if not self.token and self.guest_id:
+                    params = f"?guest_id={self.guest_id}"
+                
+                success2, get_response = self.run_test("Verify Boardroom Decision", "GET", f"decisions/{self.boardroom_decision_id}{params}", 200)
+                if success2:
+                    result = get_response.get('result', {})
+                    has_debate = 'debate' in result
+                    has_agents = 'agent_perspectives' in result and len(result.get('agent_perspectives', [])) == 6
+                    
+                    self.log_test("Boardroom Decision - Debate", has_debate, "Missing debate field" if not has_debate else "")
+                    self.log_test("Boardroom Decision - 6 Agents", has_agents, f"Expected 6 agents, got {len(result.get('agent_perspectives', []))}" if not has_agents else "")
+                    
+                    return success2
+            return success
+            
+        except Exception as e:
+            self.log_test("Boardroom Payload Seeding", False, f"Error loading payload: {str(e)}")
+            return False
+
     def validate_basic_schema(self, result):
         """Validate basic decision schema"""
         required_fields = ['options', 'best_option_id', 'reasoning', 'confidence', 'goal', 'key_insights']
@@ -648,6 +746,125 @@ class SmartDecisionAPITester:
             print(f"   Scorecard Confidence: {scorecard.get('confidence', 'N/A')}")
         
         return True
+
+    def validate_phase6_schema(self, result):
+        """Validate the Phase 6 Multi-Agent Boardroom schema"""
+        print("\n🔍 Validating Phase 6 Multi-Agent Boardroom Schema...")
+        
+        # First validate Phase 5 schema
+        phase5_valid = self.validate_phase5_schema(result)
+        
+        # Phase 6 specific fields
+        phase6_fields = {
+            'debate': dict,
+            'agent_perspectives': list,
+            '_engine': str
+        }
+        
+        phase6_valid = True
+        
+        # Check Phase 6 fields
+        for field, expected_type in phase6_fields.items():
+            if field in result:
+                value = result[field]
+                if isinstance(value, expected_type):
+                    self.log_test(f"Phase6 Schema - {field}", True)
+                    
+                    # Detailed validation for each field
+                    if field == 'agent_perspectives':
+                        expected_agents = ['Strategic', 'Financial', 'Risk', 'Execution', 'Contrarian', 'Optimization']
+                        if len(value) == 6:
+                            self.log_test(f"Phase6 Schema - agent_perspectives count", True, f"Found {len(value)} agents")
+                            
+                            # Check each agent
+                            found_agents = []
+                            for agent in value:
+                                agent_name = agent.get('agent', '')
+                                found_agents.append(agent_name)
+                                
+                                # Check agent structure
+                                agent_fields = ['agent', 'summary', 'details']
+                                for agent_field in agent_fields:
+                                    if agent_field in agent:
+                                        self.log_test(f"Phase6 Schema - agent.{agent_field}", True)
+                                    else:
+                                        self.log_test(f"Phase6 Schema - agent.{agent_field}", False, f"Missing agent field: {agent_field}")
+                                        phase6_valid = False
+                            
+                            # Check all expected agents are present
+                            for expected_agent in expected_agents:
+                                if expected_agent in found_agents:
+                                    self.log_test(f"Phase6 Schema - {expected_agent} agent", True)
+                                else:
+                                    self.log_test(f"Phase6 Schema - {expected_agent} agent", False, f"Missing {expected_agent} agent")
+                                    phase6_valid = False
+                        else:
+                            self.log_test(f"Phase6 Schema - agent_perspectives count", False, f"Expected 6 agents, got {len(value)}")
+                            phase6_valid = False
+                    
+                    elif field == 'debate':
+                        debate_fields = ['conflicts', 'trade_offs', 'convergence']
+                        for debate_field in debate_fields:
+                            if debate_field in value:
+                                self.log_test(f"Phase6 Schema - debate.{debate_field}", True)
+                                
+                                # Check conflicts structure
+                                if debate_field == 'conflicts' and isinstance(value[debate_field], list):
+                                    conflicts = value[debate_field]
+                                    if len(conflicts) > 0:
+                                        conflict = conflicts[0]
+                                        conflict_fields = ['topic', 'views', 'resolution']
+                                        for conflict_field in conflict_fields:
+                                            if conflict_field in conflict:
+                                                self.log_test(f"Phase6 Schema - conflict.{conflict_field}", True)
+                                                
+                                                # Check views structure
+                                                if conflict_field == 'views' and isinstance(conflict[conflict_field], list):
+                                                    views = conflict[conflict_field]
+                                                    if len(views) > 0:
+                                                        view = views[0]
+                                                        view_fields = ['agent', 'view']
+                                                        for view_field in view_fields:
+                                                            if view_field in view:
+                                                                self.log_test(f"Phase6 Schema - view.{view_field}", True)
+                                                            else:
+                                                                self.log_test(f"Phase6 Schema - view.{view_field}", False, f"Missing view field: {view_field}")
+                                            else:
+                                                self.log_test(f"Phase6 Schema - conflict.{conflict_field}", False, f"Missing conflict field: {conflict_field}")
+                            else:
+                                self.log_test(f"Phase6 Schema - debate.{debate_field}", False, f"Missing debate field: {debate_field}")
+                    
+                    elif field == '_engine':
+                        if value in ['multi_agent', 'legacy_fallback']:
+                            self.log_test(f"Phase6 Schema - _engine value", True, f"Engine: {value}")
+                        else:
+                            self.log_test(f"Phase6 Schema - _engine value", False, f"Invalid engine value: {value}")
+                            phase6_valid = False
+                
+                else:
+                    self.log_test(f"Phase6 Schema - {field}", False, f"Wrong type: expected {expected_type.__name__}, got {type(value).__name__}")
+                    phase6_valid = False
+            else:
+                self.log_test(f"Phase6 Schema - {field}", False, f"Missing Phase 6 field: {field}")
+                phase6_valid = False
+        
+        # Print summary of Phase 6 fields
+        print(f"   Engine Used: {result.get('_engine', 'N/A')}")
+        print(f"   Agent Perspectives: {len(result.get('agent_perspectives', []))} agents")
+        print(f"   Debate Present: {bool(result.get('debate'))}")
+        
+        if result.get('debate'):
+            debate = result['debate']
+            print(f"   Debate Conflicts: {len(debate.get('conflicts', []))}")
+            print(f"   Debate Trade-offs: {len(debate.get('trade_offs', []))}")
+            print(f"   Debate Convergence: {bool(debate.get('convergence'))}")
+        
+        if result.get('agent_perspectives'):
+            agents = result['agent_perspectives']
+            agent_names = [a.get('agent', 'Unknown') for a in agents]
+            print(f"   Agents Found: {', '.join(agent_names)}")
+        
+        return phase5_valid and phase6_valid
         """Validate the Phase 4 Decision Intelligence schema"""
         print("\n🔍 Validating Phase 4 Decision Intelligence Schema...")
         
@@ -873,6 +1090,10 @@ class SmartDecisionAPITester:
         
         # Phase 5 specific tests
         self.test_decision_analysis_with_factors_phase5()
+        
+        # Phase 6 specific tests
+        self.test_multi_agent_analysis_phase6()
+        self.test_boardroom_payload_seeding()
         
         # Saved decisions tests
         self.test_save_decision()

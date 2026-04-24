@@ -216,6 +216,34 @@ class Scorecard(BaseModel):
     confidence: conint(ge=0, le=100) = 50
 
 
+# --- Multi-Agent Boardroom (Phase 6) ---------------------------------------
+class DebateView(BaseModel):
+    model_config = {"extra": "allow"}
+    agent: str
+    view: str
+
+
+class DebateConflict(BaseModel):
+    model_config = {"extra": "allow"}
+    topic: str
+    views: List[DebateView] = Field(default_factory=list)
+    resolution: str = ""
+
+
+class Debate(BaseModel):
+    model_config = {"extra": "allow"}
+    conflicts: List[DebateConflict] = Field(default_factory=list)
+    trade_offs: List[str] = Field(default_factory=list)
+    convergence: str = ""
+
+
+class AgentPerspective(BaseModel):
+    model_config = {"extra": "allow"}
+    agent: str
+    summary: str = ""
+    details: Dict[str, Any] = Field(default_factory=dict)
+
+
 class DecisionResult(BaseModel):
     options: List[DecisionOption] = Field(min_length=3, max_length=4)
     best_option_id: str
@@ -238,6 +266,9 @@ class DecisionResult(BaseModel):
     kpis: List[KPI] = Field(default_factory=list, max_length=4)
     monetization: Optional[MonetizationTriggers] = None
     scorecard: Optional[Scorecard] = None
+    # --- Multi-Agent Boardroom (Phase 6) ---
+    debate: Optional[Debate] = None
+    agent_perspectives: List[AgentPerspective] = Field(default_factory=list, max_length=8)
 
     @field_validator("best_option_id")
     @classmethod
@@ -454,17 +485,35 @@ def _parse_json_with_repair(raw: str) -> Dict[str, Any]:
 
 
 async def _call_llm(system: str, user_text: str, *, provider: str, model: str, session_id: str) -> str:
-    chat = (
-        LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=session_id,
-            system_message=system,
+    """Run one LLM call.
+
+    IMPORTANT: `emergentintegrations.LlmChat.send_message` internally calls
+    `litellm.completion(...)` which is **synchronous/blocking** — despite being
+    wrapped in an `async def`. If we `asyncio.gather` several of these, the
+    event loop is pinned and unrelated HTTP handlers (like `/analyze/status`)
+    time out.
+
+    Fix: offload each call to the default thread pool via `asyncio.to_thread`
+    so the event loop stays responsive. Inside the thread we run a fresh tiny
+    event loop just for the single awaitable send_message.
+    """
+    def _blocking_call() -> str:
+        chat = (
+            LlmChat(
+                api_key=EMERGENT_LLM_KEY,
+                session_id=session_id,
+                system_message=system,
+            )
+            .with_model(provider, model)
+            .with_params(timeout=CALL_TIMEOUT_SECONDS, num_retries=0, max_retries=0)
         )
-        .with_model(provider, model)
-        .with_params(timeout=CALL_TIMEOUT_SECONDS, num_retries=0, max_retries=0)
-    )
-    msg = UserMessage(text=user_text)
-    return await asyncio.wait_for(chat.send_message(msg), timeout=CALL_TIMEOUT_SECONDS + 10)
+        msg = UserMessage(text=user_text)
+        # asyncio.run creates a new loop inside the worker thread.
+        return asyncio.run(
+            asyncio.wait_for(chat.send_message(msg), timeout=CALL_TIMEOUT_SECONDS + 10)
+        )
+
+    return await asyncio.to_thread(_blocking_call)
 
 
 async def _try_call_with_fallback(system: str, user_text: str, session_prefix: str) -> str:

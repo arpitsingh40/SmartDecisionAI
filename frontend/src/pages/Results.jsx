@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Trophy, ArrowLeft, Save, FileDown, Sparkles, ShieldAlert,
-  TrendingUp, Scale, Zap, BarChart3,
+  TrendingUp, Scale, Zap, BarChart3, Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -29,6 +29,7 @@ import RiskScenarios from '@/components/results/RiskScenarios';
 import FutureImpact from '@/components/results/FutureImpact';
 import ExecuteDashboard from '@/components/results/ExecuteDashboard';
 import Scorecard from '@/components/results/Scorecard';
+import BoardroomPanel from '@/components/results/BoardroomPanel';
 
 const useQuery = () => {
   const { search } = useLocation();
@@ -180,6 +181,10 @@ const Results = () => {
       <Tabs defaultValue="overview">
         <TabsList className="mb-6 flex flex-wrap">
           <TabsTrigger value="overview" data-testid="results-tab-overview">Overview</TabsTrigger>
+          <TabsTrigger value="boardroom" data-testid="results-tab-boardroom">
+            <Users className="mr-1.5 h-3.5 w-3.5" />
+            Boardroom
+          </TabsTrigger>
           <TabsTrigger value="execute" data-testid="results-tab-execute">Execute</TabsTrigger>
           <TabsTrigger value="evaluation" data-testid="results-tab-evaluation">Evaluation</TabsTrigger>
           <TabsTrigger value="risk" data-testid="results-tab-risk">Scenarios</TabsTrigger>
@@ -289,6 +294,13 @@ const Results = () => {
 
         <TabsContent value="execute">
           <ExecuteDashboard result={result} best={best} />
+        </TabsContent>
+
+        <TabsContent value="boardroom">
+          <BoardroomPanel
+            agentPerspectives={result?.agent_perspectives || []}
+            debate={result?.debate || null}
+          />
         </TabsContent>
 
         <TabsContent value="evaluation">

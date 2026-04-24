@@ -301,6 +301,31 @@ async def analyze_decision_multiagent(
                         ratings[fn] = 5
                 o["factor_ratings"] = ratings
             data.setdefault("factors_used", factor_names)
+            # --- Defensive normalization to match DecisionResult caps ---
+            # These caps match the Pydantic schema in ai_service.py; trimming
+            # here prevents spurious ValidationErrors when the LLM is verbose.
+            if isinstance(data.get("key_insights"), list):
+                data["key_insights"] = data["key_insights"][:3]
+            if isinstance(data.get("assumptions"), list):
+                data["assumptions"] = data["assumptions"][:4]
+            if isinstance(data.get("bias_flags"), list):
+                data["bias_flags"] = data["bias_flags"][:3]
+            if isinstance(data.get("key_reasons"), list):
+                data["key_reasons"] = data["key_reasons"][:4]
+            if isinstance(data.get("risks"), list):
+                data["risks"] = data["risks"][:4]
+            if isinstance(data.get("automation_layer"), list):
+                data["automation_layer"] = data["automation_layer"][:3]
+            if isinstance(data.get("kpis"), list):
+                data["kpis"] = data["kpis"][:4]
+            if isinstance(data.get("options"), list):
+                # Schema allows 3-4 options; trim extras, let too-few fall through to retry.
+                data["options"] = data["options"][:4]
+                for o in data["options"]:
+                    if isinstance(o.get("pros"), list):
+                        o["pros"] = o["pros"][:3]
+                    if isinstance(o.get("cons"), list):
+                        o["cons"] = o["cons"][:3]
             # Ensure agent_perspectives is present with the raw agent summaries
             if not data.get("agent_perspectives"):
                 data["agent_perspectives"] = [
