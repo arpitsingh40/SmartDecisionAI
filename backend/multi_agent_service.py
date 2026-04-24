@@ -301,6 +301,25 @@ async def analyze_decision_multiagent(
                         ratings[fn] = 5
                 o["factor_ratings"] = ratings
             data.setdefault("factors_used", factor_names)
+            # --- Defensive backfills for required fields the LLM may omit ---
+            # Different LLM families have different instruction-adherence patterns.
+            # GPT-5.x reasoning models sometimes skip scalar fields in favor of
+            # richer prose in nested structures. We cover the common misses so
+            # one small omission doesn't force a retry (cost + latency hit).
+            if "confidence" not in data or data.get("confidence") is None:
+                # Derive a reasonable confidence from agent risk_score if available.
+                rs = (risk or {}).get("risk_score_100")
+                if isinstance(rs, (int, float)):
+                    data["confidence"] = max(0, min(100, 100 - int(rs)))
+                else:
+                    data["confidence"] = 75
+            if not data.get("goal"):
+                data["goal"] = (strategic or {}).get("goal_restated") or decision_context[:140]
+            if not data.get("reasoning"):
+                data["reasoning"] = (
+                    "Synthesis of the six-agent panel. "
+                    + ((strategic or {}).get("summary", "")[:200])
+                )
             # --- Defensive normalization to match DecisionResult caps ---
             # These caps match the Pydantic schema in ai_service.py; trimming
             # here prevents spurious ValidationErrors when the LLM is verbose.

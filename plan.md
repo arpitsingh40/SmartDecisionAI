@@ -33,6 +33,7 @@
 - ✅ Phase 4 complete (Structured pipeline + factor-weighted scoring + new tabs + transparency + instant what-if).
 - ✅ Phase 6 complete (Multi-Agent Boardroom + parallel 6-agent synthesis + debate UI + event-loop fix + legacy auto-fallback).
 - ✅ Phase 7 complete (Interactive Debate & Refinement Mode — smart-hybrid clarification + full 6-agent re-run + structured what-changed diff + history trail + confidence delta banner).
+- ✅ Phase 8 complete (LLM stack swap — OpenAI **GPT-5.2** as primary via user-provided `OPENAI_API_KEY` using the direct `AsyncOpenAI` SDK; Claude Haiku via Emergent stays as fallback; GPT-4.1 via Emergent as last-resort).
 
 ---
 

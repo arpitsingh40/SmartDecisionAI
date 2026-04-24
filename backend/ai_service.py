@@ -19,6 +19,15 @@ Pipeline stages (all wrapped in strict JSON):
        - plan_b + plan_b_trigger
        - best_option_id, reasoning, confidence (0-100)
 
+LLM stack (Phase 8 — user-provided OpenAI key):
+  - PRIMARY : OpenAI GPT-5.2 via the official `openai` SDK using a
+              user-provided OPENAI_API_KEY. Truly async — no threadpool
+              workaround needed.
+  - FALLBACK: Claude Haiku (via `emergentintegrations.LlmChat`, using the
+              platform EMERGENT_LLM_KEY) — wrapped in `asyncio.to_thread`
+              because LiteLLM's completion is blocking under the hood.
+  - EXTRA FALLBACK: GPT-4.1 via Emergent (last-resort if Claude also fails).
+
 Notes:
   - Scoring is typically computed client-side: score = Σ (weight_i × rating_i)
   - AI's numeric score is kept for UIs without access to weights (fallback).
@@ -28,6 +37,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 import uuid
@@ -38,21 +48,47 @@ from dotenv import load_dotenv
 from json_repair import repair_json
 from pydantic import BaseModel, Field, ValidationError, conint, field_validator
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import AsyncOpenAI
 
 load_dotenv(Path(__file__).parent / ".env")
+
+logger = logging.getLogger(__name__)
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
 if not EMERGENT_LLM_KEY:
     raise RuntimeError("EMERGENT_LLM_KEY not set in environment")
 
-# Primary model (fast + high quality, typical 3-10s)
-PRIMARY_PROVIDER = "anthropic"
-PRIMARY_MODEL = "claude-haiku-4-5-20251001"
-# Fallback (different provider for resilience)
-FALLBACK_PROVIDER = "openai"
-FALLBACK_MODEL = "gpt-4.1"
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_PRIMARY_MODEL = os.environ.get("OPENAI_PRIMARY_MODEL", "gpt-5.2")
 
-CALL_TIMEOUT_SECONDS = 90.0
+# Primary: OpenAI GPT-5.2 via the user-provided API key (direct SDK, truly async)
+# Secondary: Claude Haiku via Emergent (LiteLLM, blocking — wrapped in to_thread)
+# Tertiary: GPT-4.1 via Emergent (last-resort)
+PRIMARY_PROVIDER = "openai_direct"
+PRIMARY_MODEL = OPENAI_PRIMARY_MODEL
+SECONDARY_PROVIDER = "emergent"
+SECONDARY_MODEL = "claude-haiku-4-5-20251001"  # Anthropic via LiteLLM
+TERTIARY_PROVIDER = "emergent"
+TERTIARY_MODEL = "gpt-4.1"  # OpenAI via LiteLLM
+
+CALL_TIMEOUT_SECONDS = 180.0
+OPENAI_MAX_COMPLETION_TOKENS = int(os.environ.get("OPENAI_MAX_COMPLETION_TOKENS", "6000"))
+
+# Shared AsyncOpenAI client (pool + retries baked in). Lazily created.
+_openai_client: Optional[AsyncOpenAI] = None
+
+
+def _get_openai_client() -> Optional[AsyncOpenAI]:
+    global _openai_client
+    if not OPENAI_API_KEY:
+        return None
+    if _openai_client is None:
+        _openai_client = AsyncOpenAI(
+            api_key=OPENAI_API_KEY,
+            timeout=CALL_TIMEOUT_SECONDS,
+            max_retries=2,
+        )
+    return _openai_client
 
 
 # ====================================================================
@@ -569,18 +605,39 @@ def _parse_json_with_repair(raw: str) -> Dict[str, Any]:
         return json.loads(repaired)
 
 
-async def _call_llm(system: str, user_text: str, *, provider: str, model: str, session_id: str) -> str:
-    """Run one LLM call.
+async def _call_openai_direct(system: str, user_text: str, *, model: str, session_id: str) -> str:
+    """Call OpenAI (GPT-5.x family) via the official SDK.
 
-    IMPORTANT: `emergentintegrations.LlmChat.send_message` internally calls
-    `litellm.completion(...)` which is **synchronous/blocking** — despite being
-    wrapped in an `async def`. If we `asyncio.gather` several of these, the
-    event loop is pinned and unrelated HTTP handlers (like `/analyze/status`)
-    time out.
+    AsyncOpenAI is TRULY async — no threadpool wrapper needed, so this path
+    keeps the event loop responsive even under heavy parallel load (e.g. the
+    6-agent Boardroom panel).
 
-    Fix: offload each call to the default thread pool via `asyncio.to_thread`
-    so the event loop stays responsive. Inside the thread we run a fresh tiny
-    event loop just for the single awaitable send_message.
+    GPT-5.x uses `max_completion_tokens` (not `max_tokens`) and does not
+    accept `temperature` overrides (fixed reasoning mode).
+    """
+    client = _get_openai_client()
+    if client is None:
+        raise RuntimeError("OPENAI_API_KEY not set; cannot call OpenAI direct path")
+    resp = await client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_text},
+        ],
+        max_completion_tokens=OPENAI_MAX_COMPLETION_TOKENS,
+    )
+    content = (resp.choices[0].message.content or "").strip()
+    if not content:
+        raise RuntimeError(f"OpenAI returned empty content (model={model}, session={session_id})")
+    return content
+
+
+async def _call_emergent(system: str, user_text: str, *, provider: str, model: str, session_id: str) -> str:
+    """Call Claude/GPT via the Emergent LiteLLM proxy.
+
+    LiteLLM's completion() is synchronous/blocking despite being wrapped in
+    an `async def` — so we offload the whole thing to the default thread
+    pool to keep the event loop free for other handlers (e.g. polling).
     """
     def _blocking_call() -> str:
         chat = (
@@ -597,12 +654,37 @@ async def _call_llm(system: str, user_text: str, *, provider: str, model: str, s
         return asyncio.run(
             asyncio.wait_for(chat.send_message(msg), timeout=CALL_TIMEOUT_SECONDS + 10)
         )
-
     return await asyncio.to_thread(_blocking_call)
 
 
+async def _call_llm(system: str, user_text: str, *, provider: str, model: str, session_id: str) -> str:
+    """Dispatch one LLM call to the correct backend based on `provider`.
+
+    `provider` values:
+      - "openai_direct" — user's own OPENAI_API_KEY via the official SDK (async)
+      - "emergent"      — EMERGENT_LLM_KEY via LiteLLM (blocking, to_thread wrapped)
+      - anything else is passed through to the emergent backend for
+        backwards-compat with existing call sites.
+    """
+    if provider == "openai_direct":
+        return await _call_openai_direct(system, user_text, model=model, session_id=session_id)
+    # LiteLLM uses "openai" as the top-level provider for Anthropic models too;
+    # map "anthropic" to "openai" (LiteLLM convention used by emergentintegrations).
+    litellm_provider = "openai"
+    return await _call_emergent(
+        system, user_text, provider=litellm_provider, model=model, session_id=session_id,
+    )
+
+
 async def _try_call_with_fallback(system: str, user_text: str, session_prefix: str) -> str:
-    providers = [(PRIMARY_PROVIDER, PRIMARY_MODEL), (FALLBACK_PROVIDER, FALLBACK_MODEL)]
+    """Try the 3-provider chain: GPT-5.2 (direct) -> Claude Haiku -> GPT-4.1."""
+    providers: List[tuple[str, str]] = []
+    # Skip the OpenAI-direct path if the key isn't present (dev / CI envs).
+    if _get_openai_client() is not None:
+        providers.append((PRIMARY_PROVIDER, PRIMARY_MODEL))
+    providers.append((SECONDARY_PROVIDER, SECONDARY_MODEL))
+    providers.append((TERTIARY_PROVIDER, TERTIARY_MODEL))
+
     last_err: Optional[Exception] = None
     for provider, model in providers:
         try:
@@ -614,6 +696,10 @@ async def _try_call_with_fallback(system: str, user_text: str, session_prefix: s
                 session_id=f"{session_prefix}-{uuid.uuid4()}",
             )
         except Exception as e:
+            logger.warning(
+                "LLM provider %s/%s failed for %s: %s",
+                provider, model, session_prefix, str(e)[:200],
+            )
             last_err = e
             continue
     raise RuntimeError(f"All LLM providers failed: {last_err}")

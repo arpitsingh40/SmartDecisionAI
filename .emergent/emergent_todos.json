@@ -1,38 +1,30 @@
 [
   {
-    "content": "Design + create debate_service.py (concern extractor, smart-hybrid decide, refinement runner, 'what changed' synthesizer)",
+    "content": "Install openai SDK (already 1.99.9), add OPENAI_API_KEY to backend/.env",
     "status": "completed"
   },
   {
-    "content": "Extend schemas in models/ai_service.py for DebateTurn, RefinedOutput, ConcernExtraction",
+    "content": "Add AsyncOpenAI client + _call_openai_direct() to ai_service.py",
     "status": "completed"
   },
   {
-    "content": "Add debate job endpoints in server.py: POST /debate/start, GET /debate/status/{job_id}, POST /debate/continue, POST /debate/revert",
+    "content": "Rewire _try_call_with_fallback: GPT-5.2 primary -> Claude Haiku -> GPT-4.1",
     "status": "completed"
   },
   {
-    "content": "Persist debate_history on decision document",
+    "content": "Verify suggest-factors + followups run via GPT-5.2 (fast endpoints)",
     "status": "completed"
   },
   {
-    "content": "Frontend API client: startDebate, pollDebate, continueDebate, revertDebate",
+    "content": "Verify full multi-agent analyze completes via GPT-5.2 primary (slow endpoint)",
     "status": "completed"
   },
   {
-    "content": "Build DebateDialog modal (compose → clarify → processing) with polling",
+    "content": "Verify event loop stays responsive during GPT-5.2 calls",
     "status": "completed"
   },
   {
-    "content": "Build DebatePanel + DebateTurnCard components (with history trail, before/after, confidence delta, next action, revert)",
-    "status": "completed"
-  },
-  {
-    "content": "Wire Challenge button in Results header + new Debate tab",
-    "status": "completed"
-  },
-  {
-    "content": "Backend + frontend E2E verification via playwright + seeded demo + real HTTP round-trip",
+    "content": "Add defensive backfills for fields GPT-5.2 sometimes omits (confidence, goal, reasoning)",
     "status": "completed"
   }
 ]
