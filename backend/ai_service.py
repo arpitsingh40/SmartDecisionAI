@@ -778,6 +778,31 @@ async def analyze_decision(
                 o["factor_ratings"] = ratings
             # Echo factors_used if missing
             data.setdefault("factors_used", factor_names)
+            # --- Defensive normalization (same logic as multi_agent_service)
+            # Clamp common max_length overruns + trim list caps before validation.
+            from multi_agent_service import _normalize_synth_payload
+            for k, cap in [
+                ("key_insights", 3), ("assumptions", 4), ("bias_flags", 3),
+                ("key_reasons", 4), ("risks", 4),
+                ("automation_layer", 3), ("kpis", 4),
+            ]:
+                if isinstance(data.get(k), list):
+                    data[k] = data[k][:cap]
+            if isinstance(data.get("options"), list):
+                data["options"] = data["options"][:4]
+                for o in data["options"]:
+                    if isinstance(o.get("pros"), list):
+                        o["pros"] = o["pros"][:3]
+                    if isinstance(o.get("cons"), list):
+                        o["cons"] = o["cons"][:3]
+            data = _normalize_synth_payload(data)
+            # Backfill required scalars GPT-5.x sometimes omits
+            if "confidence" not in data or data.get("confidence") is None:
+                data["confidence"] = 75
+            if not data.get("goal"):
+                data["goal"] = decision_context[:140]
+            if not data.get("reasoning"):
+                data["reasoning"] = "Analysis based on factor ratings and stated priorities."
             return DecisionResult(**data)
         except (json.JSONDecodeError, ValidationError, ValueError) as e:
             last_err = str(e)[:400]

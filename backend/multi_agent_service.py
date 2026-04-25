@@ -219,6 +219,67 @@ SCHEMA (EXACT — all fields required unless marked optional):
 # -----------------------------------------------------------------------------
 # Helpers — run a single agent (tolerant to failure; returns empty on error)
 # -----------------------------------------------------------------------------
+def _clamp_str(s: Any, max_len: int) -> Any:
+    """Truncate a string to max_len, preserving non-strings unchanged."""
+    if isinstance(s, str) and len(s) > max_len:
+        return s[: max_len - 1].rstrip() + "…"
+    return s
+
+
+def _normalize_synth_payload(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Clamp known fields that exceed schema limits.
+
+    GPT-5.x reasoning models tend to be verbose and frequently overrun the
+    `max_length` constraints we set on RiskItem.mitigation, BiasFlag.message,
+    etc. Truncating before Pydantic validates avoids spurious retries.
+    """
+    # bias_flags: title<=80, message<=280
+    for bf in data.get("bias_flags") or []:
+        if isinstance(bf, dict):
+            bf["title"] = _clamp_str(bf.get("title"), 80)
+            bf["message"] = _clamp_str(bf.get("message"), 280)
+    # risks: risk<=140, mitigation<=200
+    for r in data.get("risks") or []:
+        if isinstance(r, dict):
+            r["risk"] = _clamp_str(r.get("risk"), 140)
+            r["mitigation"] = _clamp_str(r.get("mitigation"), 200)
+    # automation_layer: area<=60, how_it_helps<=200, tools list<=6
+    for a in data.get("automation_layer") or []:
+        if isinstance(a, dict):
+            a["area"] = _clamp_str(a.get("area"), 60)
+            a["how_it_helps"] = _clamp_str(a.get("how_it_helps"), 200)
+            if isinstance(a.get("tools"), list):
+                a["tools"] = a["tools"][:6]
+    # kpis: name<=60, how_to_measure<=200
+    for k in data.get("kpis") or []:
+        if isinstance(k, dict):
+            k["name"] = _clamp_str(k.get("name"), 60)
+            k["how_to_measure"] = _clamp_str(k.get("how_to_measure"), 200)
+    # execution_plan.steps[*].action_button.label <= 30
+    ep = data.get("execution_plan") or {}
+    for step in ep.get("steps") or []:
+        ab = (step or {}).get("action_button")
+        if isinstance(ab, dict):
+            ab["label"] = _clamp_str(ab.get("label"), 30)
+    # monetization lists capped at 5
+    mon = data.get("monetization") or {}
+    if isinstance(mon, dict):
+        for k in ("services", "products", "upsells"):
+            if isinstance(mon.get(k), list):
+                mon[k] = mon[k][:5]
+    # options: pros/cons strings (no max but lists capped already), bias-flag-like overruns
+    for o in data.get("options") or []:
+        if not isinstance(o, dict):
+            continue
+        # Some agents put long expected_return strings; the schema doesn't cap
+        # those but trim absurdly long ones to keep UI clean.
+        if isinstance(o.get("expected_return"), str):
+            o["expected_return"] = _clamp_str(o["expected_return"], 240)
+        if isinstance(o.get("time_to_result"), str):
+            o["time_to_result"] = _clamp_str(o["time_to_result"], 80)
+    return data
+
+
 async def _run_agent(name: str, system_prompt: str, user_text: str) -> Dict[str, Any]:
     try:
         raw = await _try_call_with_fallback(system_prompt, user_text, f"agent-{name.lower()}")
@@ -345,6 +406,8 @@ async def analyze_decision_multiagent(
                         o["pros"] = o["pros"][:3]
                     if isinstance(o.get("cons"), list):
                         o["cons"] = o["cons"][:3]
+            # Clamp any string fields that GPT-5.2 commonly overruns
+            data = _normalize_synth_payload(data)
             # Ensure agent_perspectives is present with the raw agent summaries
             if not data.get("agent_perspectives"):
                 data["agent_perspectives"] = [
